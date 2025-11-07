@@ -19,7 +19,7 @@ import { Colors } from '../constants/theme';
 import { useColorScheme } from '../hooks/use-color-scheme';
 
 export default function LoginScreen() {
-  const { signIn } = useAuth();
+  const { signIn, setRole } = useAuth();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const { width } = Dimensions.get('window');
@@ -59,16 +59,60 @@ export default function LoginScreen() {
       await signIn(email, password);
       setIsLoading(false);
       
-      // En lugar de determinar el rol por el email, esto ahora debería
-      // ser manejado por los claims o metadata del usuario en Supabase
+      // Obtener el usuario autenticado
       const { data: { user } } = await supabase.auth.getUser();
-      const { data: roleData } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', user?.id)
-        .single();
-      
-      const isBarber = roleData?.role === 'barber';
+
+      // Intentar obtener el rol desde la tabla `profiles` (se crea en register.tsx)
+      // Si no existe, intentar `user_metadata.role`, y como último recurso la
+      // tabla `user_roles` para mantener compatibilidad con implementaciones previas.
+      let role: string | null = null;
+
+      if (user?.id) {
+        try {
+          const { data: profileData, error: profileError } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', user.id)
+            .single();
+
+          if (!profileError) {
+            // profileData puede ser un objeto con { role }
+            role = (profileData as any)?.role ?? null;
+          }
+        } catch (err) {
+          // continuar con otros intentos de fallback
+          role = null;
+        }
+      }
+
+      // Fallback a user_metadata (si lo usan en Supabase Auth)
+      if (!role) {
+        role = (user as any)?.user_metadata?.role ?? null;
+      }
+
+      // Último recurso: tabla user_roles si existe (compatibilidad)
+      if (!role) {
+        try {
+          const { data: roleData } = await supabase
+            .from('user_roles')
+            .select('role')
+            .eq('user_id', user?.id)
+            .single();
+          role = roleData?.role ?? null;
+        } catch (err) {
+          role = null;
+        }
+      }
+
+      const isBarber = role === 'barber';
+
+      // Actualizar role en el AuthContext para que layouts que dependan
+      // de él (p. ej. AdminLayout) lo tengan inmediatamente.
+      try {
+        setRole?.(role);
+      } catch (err) {
+        console.error('Error setting role in context:', err);
+      }
       
       Alert.alert(
         'Inicio de Sesión Exitoso',
@@ -77,7 +121,7 @@ export default function LoginScreen() {
           text: 'Continuar', 
           onPress: () => {
             if (isBarber) {
-              router.replace('/admin/' as any);
+              router.replace('/admin');
             } else {
               router.replace('/(tabs)');
             }
