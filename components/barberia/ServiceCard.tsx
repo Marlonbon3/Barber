@@ -44,11 +44,9 @@ export function ServiceCard({ service, onPress }: ServiceCardProps) {
         </Text>
         
         <View style={styles.details}>
-          <View style={styles.priceContainer}>
-            <Text style={[styles.price, { color: colors.primary }]}>
-              ${service.price}
-            </Text>
-          </View>
+          <Text style={[styles.price, { color: colors.primary }]}>
+            ${service.price}
+          </Text>
           <View style={styles.durationContainer}>
             <IconSymbol name="clock" size={16} color={colors.icon} />
             <Text style={[styles.duration, { color: colors.icon }]}>
@@ -105,14 +103,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  priceContainer: {
-    backgroundColor: '#F5E6A3',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
   price: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: 'bold',
   },
   durationContainer: {

@@ -1,12 +1,12 @@
-import { ScrollView, StyleSheet, View, Text, TextInput, TouchableOpacity, Alert } from 'react-native';
+import { BarberCard } from '@/components/barberia/BarberCard';
+import { CustomButton } from '@/components/barberia/CustomButton';
+import { ServiceCard } from '@/components/barberia/ServiceCard';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { BarberCard } from '@/components/barberia/BarberCard';
-import { ServiceCard } from '@/components/barberia/ServiceCard';
-import { CustomButton } from '@/components/barberia/CustomButton';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useState } from 'react';
+import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 export default function BookAppointmentScreen() {
   const colorScheme = useColorScheme();
@@ -328,7 +328,11 @@ export default function BookAppointmentScreen() {
               Información del Cliente
             </ThemedText>
             
-            <View style={styles.formContainer}>
+            <ScrollView 
+              style={styles.formContainer}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.scrollContent}
+            >
               <View style={styles.inputContainer}>
                 <Text style={[styles.inputLabel, { color: colors.text }]}>Nombre completo *</Text>
                 <TextInput
@@ -393,7 +397,7 @@ export default function BookAppointmentScreen() {
                   <Text style={[styles.summaryValue, styles.totalValue, { color: colors.primary }]}>${selectedService?.price}</Text>
                 </View>
               </View>
-            </View>
+            </ScrollView>
           </ThemedView>
         );
 
