@@ -1,5 +1,5 @@
-import { ScrollView, StyleSheet, Text, View, TouchableOpacity } from 'react-native';
 import { router } from 'expo-router';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { IconSymbol } from '../../components/ui/icon-symbol';
 import { Colors } from '../../constants/theme';
 import { useColorScheme } from '../../hooks/use-color-scheme';
