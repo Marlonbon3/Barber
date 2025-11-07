@@ -1,22 +1,24 @@
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
 import { router, Stack } from 'expo-router';
 import { useState } from 'react';
 import {
-    Alert,
-    Dimensions,
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  Alert,
+  Dimensions,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
+import { useAuth } from '../components/auth/AuthContext';
+import { IconSymbol } from '../components/ui/icon-symbol';
+import { Colors } from '../constants/theme';
+import { useColorScheme } from '../hooks/use-color-scheme';
 
 export default function LoginScreen() {
+  const { signIn } = useAuth();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const { width } = Dimensions.get('window');
@@ -52,18 +54,34 @@ export default function LoginScreen() {
 
     setIsLoading(true);
     
-    // Simular autenticación
-    setTimeout(() => {
+    try {
+      await signIn(email, password);
       setIsLoading(false);
+      
+      // Determinar redirección según el rol
+      const isBarber = email.toLowerCase().includes('barber') || 
+                       email.toLowerCase().includes('barbero') || 
+                       email.toLowerCase().includes('admin');
+      
       Alert.alert(
         'Inicio de Sesión Exitoso',
         '¡Bienvenido a BarberLine!',
         [{ 
           text: 'Continuar', 
-          onPress: () => router.replace('/(tabs)') 
+          onPress: () => {
+            if (isBarber) {
+              router.replace('/admin/' as any);
+            } else {
+              router.replace('/(tabs)');
+            }
+          }
         }]
       );
-    }, 1500);
+    } catch (error) {
+      console.error('Login error:', error);
+      setIsLoading(false);
+      Alert.alert('Error', 'No se pudo iniciar sesión');
+    }
   };
 
   const isValidEmail = (email: string) => {
