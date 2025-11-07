@@ -12,6 +12,7 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
+import { supabase } from '../utils/database';
 import { useAuth } from '../components/auth/AuthContext';
 import { IconSymbol } from '../components/ui/icon-symbol';
 import { Colors } from '../constants/theme';
@@ -58,10 +59,16 @@ export default function LoginScreen() {
       await signIn(email, password);
       setIsLoading(false);
       
-      // Determinar redirección según el rol
-      const isBarber = email.toLowerCase().includes('barber') || 
-                       email.toLowerCase().includes('barbero') || 
-                       email.toLowerCase().includes('admin');
+      // En lugar de determinar el rol por el email, esto ahora debería
+      // ser manejado por los claims o metadata del usuario en Supabase
+      const { data: { user } } = await supabase.auth.getUser();
+      const { data: roleData } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user?.id)
+        .single();
+      
+      const isBarber = roleData?.role === 'barber';
       
       Alert.alert(
         'Inicio de Sesión Exitoso',
@@ -77,10 +84,15 @@ export default function LoginScreen() {
           }
         }]
       );
-    } catch (error) {
+    } catch (error: any) {
       console.error('Login error:', error);
       setIsLoading(false);
-      Alert.alert('Error', 'No se pudo iniciar sesión');
+      Alert.alert(
+        'Error', 
+        error.message === 'Invalid login credentials'
+          ? 'Credenciales inválidas'
+          : 'No se pudo iniciar sesión'
+      );
     }
   };
 
@@ -89,13 +101,40 @@ export default function LoginScreen() {
     return emailRegex.test(email);
   };
 
-  const handleForgotPassword = () => {
+  const handleForgotPassword = async () => {
+    if (!email.trim()) {
+      Alert.alert('Error', 'Por favor ingresa tu email');
+      return;
+    }
+
+    if (!isValidEmail(email)) {
+      Alert.alert('Error', 'Por favor ingresa un email válido');
+      return;
+    }
+
     Alert.alert(
       'Recuperar Contraseña',
       'Se enviará un enlace de recuperación a tu email registrado',
       [
         { text: 'Cancelar', style: 'cancel' },
-        { text: 'Enviar', onPress: () => console.log('Sending recovery email') }
+        { 
+          text: 'Enviar',
+          onPress: async () => {
+            try {
+              const { error } = await supabase.auth.resetPasswordForEmail(email);
+              if (error) throw error;
+              Alert.alert(
+                'Enlace Enviado',
+                'Por favor revisa tu email para resetear tu contraseña'
+              );
+            } catch (error: any) {
+              Alert.alert(
+                'Error',
+                'No se pudo enviar el enlace de recuperación'
+              );
+            }
+          }
+        }
       ]
     );
   };

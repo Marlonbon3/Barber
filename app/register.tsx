@@ -15,6 +15,7 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
+import { supabase } from '../utils/database';
 
 export default function RegisterScreen() {
   const colorScheme = useColorScheme();
@@ -98,18 +99,56 @@ export default function RegisterScreen() {
 
     setIsLoading(true);
     
-    // Simular registro
-    setTimeout(() => {
-      setIsLoading(false);
+    try {
+      // 1. Crear usuario en auth
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: formData.email,
+        password: formData.password,
+      });
+
+      if (authError) throw new Error(authError.message);
+      if (!authData?.user) throw new Error('No se pudo crear el usuario');
+
+      // 2. Crear perfil
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .upsert({
+          id: authData.user.id,
+          first_name: formData.firstName,
+          last_name: formData.lastName,
+          phone: formData.phone,
+          role: 'user'
+        });
+
+      if (profileError) throw new Error(profileError.message);
+
+      // 3. Iniciar sesión
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: formData.email,
+        password: formData.password,
+      });
+
+      if (signInError) {
+        Alert.alert(
+          'Cuenta Creada',
+          'Tu cuenta ha sido creada. Por favor inicia sesión.',
+          [{ text: 'OK', onPress: () => router.replace('/login') }]
+        );
+      } else {
+        Alert.alert(
+          'Cuenta Creada',
+          'Has iniciado sesión automáticamente.',
+          [{ text: 'Continuar', onPress: () => router.replace('/(tabs)') }]
+        );
+      }
+    } catch (error) {
       Alert.alert(
-        'Registro Exitoso',
-        '¡Tu cuenta ha sido creada exitosamente!',
-        [{ 
-          text: 'Iniciar Sesión', 
-          onPress: () => router.replace('/login') 
-        }]
+        'Error',
+        error instanceof Error ? error.message : 'Error al crear la cuenta'
       );
-    }, 1500);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
