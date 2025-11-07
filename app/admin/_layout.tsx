@@ -6,12 +6,12 @@ import { Colors } from '../../constants/theme';
 import { useColorScheme } from '../../hooks/use-color-scheme';
 
 export default function AdminLayout() {
-  const { user, signOut } = useAuth();
+  const { user, role, signOut } = useAuth();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
 
   // Verificar si el usuario es barbero
-  if (!user?.role || user.role !== 'barber') {
+  if (!role || role !== 'barber') {
     return <Redirect href="/login" />;
   }
 
@@ -25,7 +25,7 @@ export default function AdminLayout() {
             <Text style={styles.headerTitle}>Panel Administrativo</Text>
           </View>
           <View style={styles.userInfo}>
-            <Text style={styles.welcomeText}>Hola, {user.email}</Text>
+            <Text style={styles.welcomeText}>Hola, {user?.email}</Text>
             <TouchableOpacity 
               style={styles.logoutButton} 
               onPress={signOut}

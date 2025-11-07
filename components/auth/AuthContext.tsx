@@ -4,6 +4,8 @@ import { User } from '@supabase/supabase-js';
 
 interface AuthContextType {
   user: User | null;
+  role: string | null;
+  setRole?: (r: string | null) => void;
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   isLoading: boolean;
@@ -17,17 +19,52 @@ interface AuthProviderProps {
 
 export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null);
+  const [role, setRole] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     // Check active session and subscribe to auth changes
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       setUser(session?.user ?? null);
+
+      // Obtener role desde tabla profiles si existe
+      if (session?.user?.id) {
+        try {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', session.user.id)
+            .single();
+          setRole((profile as any)?.role ?? null);
+        } catch (err) {
+          console.error('Error fetching profile role:', err);
+          setRole(null);
+        }
+      } else {
+        setRole(null);
+      }
+
       setIsLoading(false);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setUser(session?.user ?? null);
+
+      if (session?.user?.id) {
+        try {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', session.user.id)
+            .single();
+          setRole((profile as any)?.role ?? null);
+        } catch (err) {
+          console.error('Error fetching profile role:', err);
+          setRole(null);
+        }
+      } else {
+        setRole(null);
+      }
     });
 
     return () => subscription.unsubscribe();
@@ -48,11 +85,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
   };
 
   const value = useMemo(() => ({ 
-    user, 
+    user,
+    role,
+    setRole,
     signIn, 
     signOut,
     isLoading 
-  }), [user, isLoading]);
+  }), [user, role, isLoading]);
 
   return (
     <AuthContext.Provider value={value}>
