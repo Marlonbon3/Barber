@@ -376,6 +376,48 @@ export default function HomeScreen() {
           />
         </View>
       </ThemedView>
+
+      {/* Login Section */}
+      <ThemedView style={[styles.loginContainer, {
+        marginBottom: responsiveSize.sectionMargin,
+        paddingHorizontal: responsiveSize.horizontalPadding
+      }]}>
+        <View style={styles.sectionHeader}>
+          <IconSymbol name="person.circle.fill" size={24} color={colors.primary} />
+          <ThemedText type="subtitle" style={styles.loginTitle}>
+            Mi Cuenta
+          </ThemedText>
+        </View>
+        
+        <View style={[styles.loginCard, { 
+          backgroundColor: colors.card, 
+          borderColor: colors.border,
+          padding: responsiveSize.cardPadding
+        }]}>
+          <ThemedText style={[styles.loginDescription, { 
+            color: colors.icon,
+            fontSize: isSmallDevice ? 14 : 16,
+            marginBottom: responsiveSize.cardPadding
+          }]}>
+            Inicia sesión para acceder a todas las funciones y gestionar tus citas
+          </ThemedText>
+          
+          <View style={styles.loginButtons}>
+            <CustomButton
+              title="Iniciar Sesión"
+              onPress={() => router.push('/login')}
+              variant="primary"
+              style={styles.loginButton}
+            />
+            <CustomButton
+              title="Registrarse"
+              onPress={() => router.push('/register')}
+              variant="outline"
+              style={styles.loginButton}
+            />
+          </View>
+        </View>
+      </ThemedView>
     </ParallaxScrollView>
   );
 }
@@ -583,5 +625,35 @@ const styles = StyleSheet.create({
   },
   callButton: {
     marginTop: 8,
+  },
+  loginContainer: {
+    // Valores dinámicos aplicados inline
+  },
+  loginTitle: {
+    textAlign: 'center',
+  },
+  loginCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 8,
+  },
+  loginDescription: {
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+  loginButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 16,
+  },
+  loginButton: {
+    flex: 1,
   },
 });
