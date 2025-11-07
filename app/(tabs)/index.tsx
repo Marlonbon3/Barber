@@ -1,7 +1,6 @@
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Dimensions, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { CustomButton } from '@/components/barberia/CustomButton';
-import { HelloWave } from '@/components/hello-wave';
 import ParallaxScrollView from '@/components/parallax-scroll-view';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -15,12 +14,30 @@ export default function HomeScreen() {
   const colors = Colors[colorScheme ?? 'light'];
   const router = useRouter();
 
+  // Variables responsive
+  const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
+  const isSmallDevice = screenWidth < 375;
+  const isMediumDevice = screenWidth >= 375 && screenWidth < 414;
+  const isLargeDevice = screenWidth >= 414;
+  
+  // Tamaños adaptativos
+  const responsiveSize = {
+    heroIconSize: isSmallDevice ? 80 : isMediumDevice ? 90 : 100,
+    heroTitleSize: isSmallDevice ? 28 : isMediumDevice ? 32 : 36,
+    heroHeight: isSmallDevice ? 240 : isMediumDevice ? 260 : 280,
+    cardPadding: isSmallDevice ? 16 : isMediumDevice ? 18 : 20,
+    sectionMargin: isSmallDevice ? 20 : isMediumDevice ? 25 : 30,
+    horizontalPadding: isSmallDevice ? 16 : 20,
+    actionIconSize: isSmallDevice ? 48 : 54,
+    contactIconSize: isSmallDevice ? 40 : 44,
+  };
+
   const quickActions = [
     {
       title: 'Agendar Cita',
       subtitle: 'Reserva tu próxima cita',
       icon: 'calendar.badge.plus',
-      onPress: () => router.push('/(tabs)/explore'),
+      onPress: () => router.push('/explore'),
       color: colors.primary,
     },
     {
@@ -43,109 +60,321 @@ export default function HomeScreen() {
     <ParallaxScrollView
       headerBackgroundColor={{ light: colors.background, dark: colors.background }}
       headerImage={
-        <View style={[styles.heroContainer, { backgroundColor: colors.primary }]}>
-          <IconSymbol
-            size={80}
-            name="scissors"
-            color={colorScheme === 'dark' ? colors.background : '#2C1810'}
-          />
-          <Text style={[styles.heroTitle, { color: colorScheme === 'dark' ? colors.background : '#2C1810' }]}>
-            Barberhub
-          </Text>
-          <Text style={[styles.heroSubtitle, { color: colorScheme === 'dark' ? colors.background : '#2C1810' }]}>
-            Estilo y tradición desde 1985
-          </Text>
+        <View style={[styles.heroContainer, { 
+          backgroundColor: colors.primary,
+          height: responsiveSize.heroHeight,
+          paddingHorizontal: responsiveSize.horizontalPadding
+        }]}>
+          <View style={styles.heroIconWrapper}>
+            <IconSymbol
+              size={responsiveSize.heroIconSize}
+              name="scissors"
+              color={colorScheme === 'dark' ? colors.background : '#2C1810'}
+            />
+            <View style={[styles.decorativeCircle, { 
+              borderColor: colorScheme === 'dark' ? colors.background : '#2C1810',
+              width: responsiveSize.heroIconSize + 20,
+              height: responsiveSize.heroIconSize + 20,
+              borderRadius: (responsiveSize.heroIconSize + 20) / 2,
+              top: -10,
+              left: -10,
+            }]} />
+          </View>
+          <View style={styles.heroTextContainer}>
+            <Text style={[styles.heroTitle, { 
+              color: colorScheme === 'dark' ? colors.background : '#2C1810',
+              fontSize: responsiveSize.heroTitleSize
+            }]}>
+              BarberLine
+            </Text>
+            <View style={[styles.titleUnderline, { backgroundColor: colorScheme === 'dark' ? colors.background : '#2C1810' }]} />
+            <Text style={[styles.heroSubtitle, { color: colorScheme === 'dark' ? colors.background : '#2C1810' }]}>
+              Estilo y tradición desde 1985
+            </Text>
+          </View>
         </View>
       }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Bienvenido</ThemedText>
-        <HelloWave />
+      <ThemedView style={[styles.titleContainer, { 
+        marginBottom: responsiveSize.sectionMargin,
+        paddingHorizontal: responsiveSize.horizontalPadding
+      }]}>
+        <View style={styles.welcomeHeader}>
+          <ThemedText type="title" style={styles.welcomeTitle}>Bienvenido</ThemedText>
+        </View>
       </ThemedView>
       
-      <ThemedView style={styles.welcomeContainer}>
-        <ThemedText style={styles.welcomeText}>
-          Descubre la experiencia única de nuestra barbería. Ofrecemos servicios de corte de cabello, 
-          arreglo de barba y cuidado personal con más de 35 años de experiencia.
-        </ThemedText>
+      <ThemedView style={[styles.welcomeContainer, { 
+        marginBottom: responsiveSize.sectionMargin,
+        paddingHorizontal: responsiveSize.horizontalPadding
+      }]}>
+        <View style={[styles.welcomeCard, { 
+          backgroundColor: colors.card, 
+          borderColor: colors.border,
+          padding: responsiveSize.cardPadding
+        }]}>
+          <IconSymbol name="star.fill" size={24} color={colors.primary} style={styles.welcomeIcon} />
+          <ThemedText style={[styles.welcomeText, {
+            fontSize: isSmallDevice ? 14 : 16
+          }]}>
+            Descubre la experiencia única de nuestra barbería. Ofrecemos servicios de corte de cabello, 
+            arreglo de barba y cuidado personal con más de 35 años de experiencia.
+          </ThemedText>
+        </View>
       </ThemedView>
 
-      <ThemedView style={styles.hoursContainer}>
-        <ThemedText type="subtitle" style={styles.hoursTitle}>
-          Horarios de Atención
-        </ThemedText>
-        <View style={styles.hoursGrid}>
-          <View style={styles.hoursRow}>
-            <ThemedText style={styles.dayText}>Lunes - Viernes</ThemedText>
-            <ThemedText style={[styles.timeText, { color: colors.primary }]}>9:00 AM - 7:00 PM</ThemedText>
+      <ThemedView style={[styles.hoursContainer, {
+        marginBottom: responsiveSize.sectionMargin,
+        paddingHorizontal: responsiveSize.horizontalPadding
+      }]}>
+        <View style={styles.sectionHeader}>
+          <IconSymbol name="clock.fill" size={24} color={colors.primary} />
+          <ThemedText type="subtitle" style={styles.hoursTitle}>
+            Horarios de Atención
+          </ThemedText>
+        </View>
+        <View style={[styles.hoursCard, { 
+          backgroundColor: colors.card, 
+          borderColor: colors.border,
+          padding: responsiveSize.cardPadding
+        }]}>
+          <View style={[styles.hoursRow, {
+            paddingVertical: isSmallDevice ? 8 : 12
+          }]}>
+            <ThemedText 
+              style={[styles.dayText, {
+                fontSize: isSmallDevice ? 12 : isMediumDevice ? 14 : 16,
+                flex: 1
+              }]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+            >
+              Lunes - Viernes
+            </ThemedText>
+            <ThemedText 
+              style={[styles.timeText, { 
+                color: colors.primary,
+                fontSize: isSmallDevice ? 12 : isMediumDevice ? 14 : 16,
+                flex: 1,
+                textAlign: 'right'
+              }]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+            >
+              9:00 AM - 7:00 PM
+            </ThemedText>
           </View>
-          <View style={styles.hoursRow}>
-            <ThemedText style={styles.dayText}>Sábados</ThemedText>
-            <ThemedText style={[styles.timeText, { color: colors.primary }]}>8:00 AM - 6:00 PM</ThemedText>
+          <View style={[styles.hoursDivider, { backgroundColor: colors.border }]} />
+          <View style={[styles.hoursRow, {
+            paddingVertical: isSmallDevice ? 8 : 12
+          }]}>
+            <ThemedText 
+              style={[styles.dayText, {
+                fontSize: isSmallDevice ? 12 : isMediumDevice ? 14 : 16,
+                flex: 1
+              }]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+            >
+              Sábados
+            </ThemedText>
+            <ThemedText 
+              style={[styles.timeText, { 
+                color: colors.primary,
+                fontSize: isSmallDevice ? 12 : isMediumDevice ? 14 : 16,
+                flex: 1,
+                textAlign: 'right'
+              }]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+            >
+              8:00 AM - 6:00 PM
+            </ThemedText>
           </View>
-          <View style={styles.hoursRow}>
-            <ThemedText style={styles.dayText}>Domingos</ThemedText>
-            <ThemedText style={[styles.timeText, { color: colors.secondary }]}>Cerrado</ThemedText>
+          <View style={[styles.hoursDivider, { backgroundColor: colors.border }]} />
+          <View style={[styles.hoursRow, {
+            paddingVertical: isSmallDevice ? 8 : 12
+          }]}>
+            <ThemedText 
+              style={[styles.dayText, {
+                fontSize: isSmallDevice ? 12 : isMediumDevice ? 14 : 16,
+                flex: 1
+              }]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+            >
+              Domingos
+            </ThemedText>
+            <ThemedText 
+              style={[styles.timeText, { 
+                color: colors.secondary,
+                fontSize: isSmallDevice ? 12 : isMediumDevice ? 14 : 16,
+                flex: 1,
+                textAlign: 'right'
+              }]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+            >
+              Cerrado
+            </ThemedText>
           </View>
         </View>
       </ThemedView>
 
-      <ThemedView style={styles.actionsContainer}>
-        <ThemedText type="subtitle" style={styles.actionsTitle}>
-          Acciones Rápidas
-        </ThemedText>
-        
-        {quickActions.map((action, index) => (
-          <TouchableOpacity
-            key={index}
-            style={[styles.actionCard, { backgroundColor: colors.card, borderColor: colors.border }]}
-            onPress={action.onPress}
-          >
-            <View style={[styles.actionIcon, { backgroundColor: action.color + '20' }]}>
-              <IconSymbol name={action.icon as any} size={24} color={action.color} />
-            </View>
-            
-            <View style={styles.actionContent}>
-              <Text style={[styles.actionTitle, { color: colors.text }]}>
-                {action.title}
-              </Text>
-              <Text style={[styles.actionSubtitle, { color: colors.icon }]}>
-                {action.subtitle}
-              </Text>
-            </View>
-            
-            <IconSymbol name="chevron.right" size={20} color={colors.icon} />
-          </TouchableOpacity>
-        ))}
-      </ThemedView>
-
-      <ThemedView style={styles.contactContainer}>
-        <ThemedText type="subtitle" style={styles.contactTitle}>
-          Contacto
-        </ThemedText>
-        
-        <View style={styles.contactInfo}>
-          <View style={styles.contactRow}>
-            <IconSymbol name="phone.fill" size={20} color={colors.primary} />
-            <ThemedText style={styles.contactText}>+1 (555) 123-4567</ThemedText>
-          </View>
-          
-          <View style={styles.contactRow}>
-            <IconSymbol name="location.fill" size={20} color={colors.primary} />
-            <ThemedText style={styles.contactText}>123 Calle Principal, Ciudad</ThemedText>
-          </View>
-          
-          <View style={styles.contactRow}>
-            <IconSymbol name="envelope.fill" size={20} color={colors.primary} />
-            <ThemedText style={styles.contactText}>info@barberiaelite.com</ThemedText>
-          </View>
+      <ThemedView style={[styles.actionsContainer, {
+        marginBottom: responsiveSize.sectionMargin,
+        paddingHorizontal: responsiveSize.horizontalPadding
+      }]}>
+        <View style={styles.sectionHeader}>
+          <IconSymbol name="bolt.fill" size={24} color={colors.primary} />
+          <ThemedText type="subtitle" style={styles.actionsTitle}>
+            Acciones Rápidas
+          </ThemedText>
         </View>
         
-        <CustomButton
-          title="Llamar Ahora"
-          onPress={() => {}}
-          variant="outline"
-          style={styles.callButton}
-        />
+        <View style={styles.actionsGrid}>
+          {quickActions.map((action, index) => (
+            <TouchableOpacity
+              key={index}
+              style={[styles.actionCard, { 
+                backgroundColor: colors.card, 
+                borderColor: colors.border,
+                padding: responsiveSize.cardPadding
+              }]}
+              onPress={action.onPress}
+            >
+              <View style={[styles.actionIcon, { 
+                backgroundColor: action.color + '15',
+                width: responsiveSize.actionIconSize,
+                height: responsiveSize.actionIconSize,
+                borderRadius: responsiveSize.actionIconSize / 2,
+                marginRight: isSmallDevice ? 12 : 16
+              }]}>
+                <IconSymbol name={action.icon as any} size={isSmallDevice ? 22 : 26} color={action.color} />
+              </View>
+              
+              <View style={styles.actionContent}>
+                <Text style={[styles.actionTitle, { 
+                  color: colors.text,
+                  fontSize: isSmallDevice ? 16 : 18
+                }]}>
+                  {action.title}
+                </Text>
+                <Text style={[styles.actionSubtitle, { 
+                  color: colors.icon,
+                  fontSize: isSmallDevice ? 12 : 14
+                }]}>
+                  {action.subtitle}
+                </Text>
+              </View>
+              
+              <View style={[styles.chevronContainer, { 
+                backgroundColor: colors.primary + '10',
+                width: isSmallDevice ? 28 : 32,
+                height: isSmallDevice ? 28 : 32,
+                borderRadius: isSmallDevice ? 14 : 16
+              }]}>
+                <IconSymbol name="chevron.right" size={isSmallDevice ? 16 : 18} color={colors.primary} />
+              </View>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </ThemedView>
+
+      <ThemedView style={[styles.contactContainer, {
+        marginBottom: responsiveSize.sectionMargin,
+        paddingHorizontal: responsiveSize.horizontalPadding
+      }]}>
+        <View style={styles.sectionHeader}>
+          <IconSymbol name="phone.fill" size={24} color={colors.primary} />
+          <ThemedText type="subtitle" style={styles.contactTitle}>
+            Contacto
+          </ThemedText>
+        </View>
+        
+        <View style={[styles.contactCard, { 
+          backgroundColor: colors.card, 
+          borderColor: colors.border,
+          padding: responsiveSize.cardPadding
+        }]}>
+          <View style={styles.contactInfo}>
+            <TouchableOpacity style={[styles.contactRow, {
+              paddingVertical: isSmallDevice ? 8 : 12
+            }]}>
+              <View style={[styles.contactIconWrapper, { 
+                backgroundColor: colors.primary + '15',
+                width: responsiveSize.contactIconSize,
+                height: responsiveSize.contactIconSize,
+                borderRadius: responsiveSize.contactIconSize / 2,
+                marginRight: isSmallDevice ? 12 : 16
+              }]}>
+                <IconSymbol name="phone.fill" size={20} color={colors.primary} />
+              </View>
+              <View style={styles.contactTextContainer}>
+                <ThemedText style={[styles.contactLabel, {
+                  fontSize: isSmallDevice ? 10 : 12
+                }]}>Teléfono</ThemedText>
+                <ThemedText style={[styles.contactText, {
+                  fontSize: isSmallDevice ? 14 : 16
+                }]}>+1 (555) 123-4567</ThemedText>
+              </View>
+            </TouchableOpacity>
+            
+            <View style={[styles.contactDivider, { backgroundColor: colors.border }]} />
+            
+            <TouchableOpacity style={[styles.contactRow, {
+              paddingVertical: isSmallDevice ? 8 : 12
+            }]}>
+              <View style={[styles.contactIconWrapper, { 
+                backgroundColor: colors.primary + '15',
+                width: responsiveSize.contactIconSize,
+                height: responsiveSize.contactIconSize,
+                borderRadius: responsiveSize.contactIconSize / 2,
+                marginRight: isSmallDevice ? 12 : 16
+              }]}>
+                <IconSymbol name="location.fill" size={20} color={colors.primary} />
+              </View>
+              <View style={styles.contactTextContainer}>
+                <ThemedText style={[styles.contactLabel, {
+                  fontSize: isSmallDevice ? 10 : 12
+                }]}>Dirección</ThemedText>
+                <ThemedText style={[styles.contactText, {
+                  fontSize: isSmallDevice ? 14 : 16
+                }]}>123 Calle Principal, Ciudad</ThemedText>
+              </View>
+            </TouchableOpacity>
+            
+            <View style={[styles.contactDivider, { backgroundColor: colors.border }]} />
+            
+            <TouchableOpacity style={[styles.contactRow, {
+              paddingVertical: isSmallDevice ? 8 : 12
+            }]}>
+              <View style={[styles.contactIconWrapper, { 
+                backgroundColor: colors.primary + '15',
+                width: responsiveSize.contactIconSize,
+                height: responsiveSize.contactIconSize,
+                borderRadius: responsiveSize.contactIconSize / 2,
+                marginRight: isSmallDevice ? 12 : 16
+              }]}>
+                <IconSymbol name="envelope.fill" size={20} color={colors.primary} />
+              </View>
+              <View style={styles.contactTextContainer}>
+                <ThemedText style={[styles.contactLabel, {
+                  fontSize: isSmallDevice ? 10 : 12
+                }]}>Email</ThemedText>
+                <ThemedText style={[styles.contactText, {
+                  fontSize: isSmallDevice ? 14 : 16
+                }]}>info@barberhub.com</ThemedText>
+              </View>
+            </TouchableOpacity>
+          </View>
+          
+          <CustomButton
+            title="Llamar Ahora"
+            onPress={() => {}}
+            variant="primary"
+            style={styles.callButton}
+          />
+        </View>
       </ThemedView>
     </ParallaxScrollView>
   );
@@ -153,121 +382,204 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   heroContainer: {
-    height: 250,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 20,
+    position: 'relative',
+  },
+  heroIconWrapper: {
+    position: 'relative',
+    marginBottom: 20,
+  },
+  decorativeCircle: {
+    position: 'absolute',
+    borderWidth: 2,
+    opacity: 0.3,
+  },
+  heroTextContainer: {
+    alignItems: 'center',
   },
   heroTitle: {
-    fontSize: 32,
     fontWeight: 'bold',
-    marginTop: 16,
     textAlign: 'center',
+    letterSpacing: 1,
+  },
+  titleUnderline: {
+    width: 80,
+    height: 3,
+    marginVertical: 8,
+    borderRadius: 2,
   },
   heroSubtitle: {
     fontSize: 16,
-    marginTop: 8,
     textAlign: 'center',
-    opacity: 0.8,
+    opacity: 0.9,
+    fontStyle: 'italic',
   },
   titleContainer: {
+    // Valores dinámicos aplicados inline
+  },
+  welcomeHeader: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 8,
-    marginBottom: 16,
+  },
+  welcomeTitle: {
+    textAlign: 'center',
   },
   welcomeContainer: {
-    marginBottom: 24,
+    // Valores dinámicos aplicados inline
+  },
+  welcomeCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 8,
+  },
+  welcomeIcon: {
+    marginBottom: 12,
   },
   welcomeText: {
-    fontSize: 16,
     lineHeight: 24,
     textAlign: 'center',
   },
   hoursContainer: {
-    marginBottom: 24,
+    // Valores dinámicos aplicados inline
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+    gap: 8,
   },
   hoursTitle: {
-    marginBottom: 16,
     textAlign: 'center',
   },
-  hoursGrid: {
-    gap: 12,
+  hoursCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 8,
   },
   hoursRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 8,
+    paddingHorizontal: 4,
+  },
+  hoursDivider: {
+    height: 1,
+    marginVertical: 4,
+    opacity: 0.5,
   },
   dayText: {
-    fontSize: 16,
     fontWeight: '500',
+    flexShrink: 1,
   },
   timeText: {
-    fontSize: 16,
     fontWeight: 'bold',
+    flexShrink: 1,
   },
   actionsContainer: {
-    marginBottom: 24,
+    // Valores dinámicos aplicados inline
   },
   actionsTitle: {
-    marginBottom: 16,
     textAlign: 'center',
+  },
+  actionsGrid: {
+    gap: 12,
   },
   actionCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    marginVertical: 6,
-    borderRadius: 12,
+    borderRadius: 16,
     borderWidth: 1,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: 4,
     },
     shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
+    shadowRadius: 6,
+    elevation: 8,
   },
   actionIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 16,
   },
   actionContent: {
     flex: 1,
   },
   actionTitle: {
-    fontSize: 16,
     fontWeight: 'bold',
-    marginBottom: 2,
+    marginBottom: 4,
   },
   actionSubtitle: {
-    fontSize: 14,
+    lineHeight: 20,
+  },
+  chevronContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   contactContainer: {
-    marginBottom: 24,
+    // Valores dinámicos aplicados inline
   },
   contactTitle: {
-    marginBottom: 16,
     textAlign: 'center',
   },
+  contactCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 8,
+  },
   contactInfo: {
-    gap: 12,
     marginBottom: 20,
   },
   contactRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+  },
+  contactIconWrapper: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  contactTextContainer: {
+    flex: 1,
+  },
+  contactLabel: {
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    opacity: 0.7,
+    marginBottom: 2,
   },
   contactText: {
-    fontSize: 16,
+    fontWeight: '500',
+  },
+  contactDivider: {
+    height: 1,
+    marginVertical: 4,
+    opacity: 0.3,
   },
   callButton: {
     marginTop: 8,

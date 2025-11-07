@@ -5,6 +5,7 @@ import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { router } from 'expo-router';
 import { useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
@@ -57,8 +58,8 @@ export default function AppointmentsScreen() {
   };
 
   const handleScheduleNew = () => {
-    console.log('Agendar nueva cita');
-    // Aquí navegarías a la pantalla de agendar cita
+    // Navegar a la pantalla de agendar cita usando push
+    router.push('/explore');
   };
 
   return (

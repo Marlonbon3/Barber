@@ -3,8 +3,10 @@ import { CustomButton } from '@/components/barberia/CustomButton';
 import { ServiceCard } from '@/components/barberia/ServiceCard';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { router, Stack } from 'expo-router';
 import { useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
@@ -118,6 +120,28 @@ export default function BookAppointmentScreen() {
 
   const dates = generateDates();
 
+  const handlePhoneChange = (text: string) => {
+    // Solo permitir números y limitar a 10 dígitos
+    const numericText = text.replace(/[^0-9]/g, '');
+    if (numericText.length <= 10) {
+      setCustomerPhone(numericText);
+    }
+  };
+
+  const handleNameChange = (text: string) => {
+    // Limitar a 50 caracteres para el nombre
+    if (text.length <= 50) {
+      setCustomerName(text);
+    }
+  };
+
+  const handleNotesChange = (text: string) => {
+    // Limitar a 200 caracteres para las notas
+    if (text.length <= 200) {
+      setNotes(text);
+    }
+  };
+
   const handleNext = () => {
     if (step < 4) {
       setStep(step + 1);
@@ -136,10 +160,21 @@ export default function BookAppointmentScreen() {
       return;
     }
 
+    if (customerPhone.length !== 10) {
+      Alert.alert('Error', 'El teléfono debe tener exactamente 10 dígitos');
+      return;
+    }
+
     Alert.alert(
       'Cita Agendada',
       `Tu cita ha sido agendada exitosamente!\n\nServicio: ${selectedService?.name}\nBarbero: ${selectedBarber?.name}\nFecha: ${selectedDate}\nHora: ${selectedTime}\nPrecio: $${selectedService?.price}`,
-      [{ text: 'OK', onPress: () => resetForm() }]
+      [{ 
+        text: 'OK', 
+        onPress: () => {
+          resetForm();
+          router.push('/(tabs)/appointments');
+        }
+      }]
     );
   };
 
@@ -163,7 +198,7 @@ export default function BookAppointmentScreen() {
       case 3:
         return selectedDate !== '' && selectedTime !== '';
       case 4:
-        return customerName.trim() !== '' && customerPhone.trim() !== '';
+        return customerName.trim() !== '' && customerPhone.trim() !== '' && customerPhone.length === 10;
       default:
         return false;
     }
@@ -334,38 +369,47 @@ export default function BookAppointmentScreen() {
               contentContainerStyle={styles.scrollContent}
             >
               <View style={styles.inputContainer}>
-                <Text style={[styles.inputLabel, { color: colors.text }]}>Nombre completo *</Text>
+                <Text style={[styles.inputLabel, { color: colors.text }]}>
+                  Nombre completo * ({customerName.length}/50)
+                </Text>
                 <TextInput
                   style={[styles.textInput, { borderColor: colors.border, color: colors.text }]}
                   placeholder="Ingresa tu nombre"
                   placeholderTextColor={colors.icon}
                   value={customerName}
-                  onChangeText={setCustomerName}
+                  onChangeText={handleNameChange}
+                  maxLength={50}
                 />
               </View>
 
               <View style={styles.inputContainer}>
-                <Text style={[styles.inputLabel, { color: colors.text }]}>Teléfono *</Text>
+                <Text style={[styles.inputLabel, { color: colors.text }]}>
+                  Teléfono * ({customerPhone.length}/10)
+                </Text>
                 <TextInput
                   style={[styles.textInput, { borderColor: colors.border, color: colors.text }]}
-                  placeholder="Ingresa tu teléfono"
+                  placeholder="Ingresa tu teléfono (10 dígitos)"
                   placeholderTextColor={colors.icon}
                   value={customerPhone}
-                  onChangeText={setCustomerPhone}
-                  keyboardType="phone-pad"
+                  onChangeText={handlePhoneChange}
+                  keyboardType="numeric"
+                  maxLength={10}
                 />
               </View>
 
               <View style={styles.inputContainer}>
-                <Text style={[styles.inputLabel, { color: colors.text }]}>Notas adicionales</Text>
+                <Text style={[styles.inputLabel, { color: colors.text }]}>
+                  Notas adicionales ({notes.length}/200)
+                </Text>
                 <TextInput
                   style={[styles.textArea, { borderColor: colors.border, color: colors.text }]}
                   placeholder="Comentarios especiales (opcional)"
                   placeholderTextColor={colors.icon}
                   value={notes}
-                  onChangeText={setNotes}
+                  onChangeText={handleNotesChange}
                   multiline
                   numberOfLines={4}
+                  maxLength={200}
                 />
               </View>
 
@@ -407,13 +451,24 @@ export default function BookAppointmentScreen() {
   };
 
   return (
-    <ThemedView style={[styles.container, { backgroundColor: colors.background }]}>
-      <ThemedView style={styles.header}>
-        <ThemedText type="title" style={styles.title}>
-          Agendar Cita
-        </ThemedText>
-        {renderStepIndicator()}
-      </ThemedView>
+    <>
+      <Stack.Screen options={{ headerShown: false }} />
+      <ThemedView style={[styles.container, { backgroundColor: colors.background }]}>
+        <ThemedView style={styles.header}>
+          <TouchableOpacity 
+            style={styles.backButton}
+            onPress={() => router.back()}
+          >
+            <IconSymbol name="chevron.left" size={24} color={colors.primary} />
+          </TouchableOpacity>
+          <ThemedText type="title" style={styles.title}>
+            Agendar Cita
+          </ThemedText>
+          <View style={styles.backButton} />
+        </ThemedView>
+        <ThemedView style={styles.stepIndicatorContainer}>
+          {renderStepIndicator()}
+        </ThemedView>
 
       {renderStepContent()}
 
@@ -444,6 +499,7 @@ export default function BookAppointmentScreen() {
         )}
       </ThemedView>
     </ThemedView>
+    </>
   );
 }
 
@@ -455,10 +511,24 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingTop: 60,
     alignItems: 'center',
+    position: 'relative',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   title: {
-    marginBottom: 20,
+    flex: 1,
     textAlign: 'center',
+  },
+  stepIndicatorContainer: {
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    alignItems: 'center',
   },
   stepIndicator: {
     flexDirection: 'row',
