@@ -122,25 +122,11 @@ export default function RegisterScreen() {
 
       if (profileError) throw new Error(profileError.message);
 
-      // 3. Iniciar sesión
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: formData.email,
-        password: formData.password,
-      });
-
-      if (signInError) {
-        Alert.alert(
-          'Cuenta Creada',
-          'Tu cuenta ha sido creada. Por favor inicia sesión.',
-          [{ text: 'OK', onPress: () => router.replace('/login') }]
-        );
-      } else {
-        Alert.alert(
-          'Cuenta Creada',
-          'Has iniciado sesión automáticamente.',
-          [{ text: 'Continuar', onPress: () => router.replace('/(tabs)') }]
-        );
-      }
+      Alert.alert(
+        'Cuenta Creada',
+        'Tu cuenta ha sido creada exitosamente. Ahora puedes iniciar sesión.',
+        [{ text: 'Continuar', onPress: () => router.replace('/login') }]
+      );
     } catch (error) {
       Alert.alert(
         'Error',

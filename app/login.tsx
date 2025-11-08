@@ -12,11 +12,11 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
-import { supabase } from '../utils/database';
 import { useAuth } from '../components/auth/AuthContext';
 import { IconSymbol } from '../components/ui/icon-symbol';
 import { Colors } from '../constants/theme';
 import { useColorScheme } from '../hooks/use-color-scheme';
+import { supabase } from '../utils/database';
 
 export default function LoginScreen() {
   const { signIn, setRole } = useAuth();
@@ -329,37 +329,6 @@ export default function LoginScreen() {
             )}
           </TouchableOpacity>
 
-          {/* Divider */}
-          <View style={styles.dividerContainer}>
-            <View style={[styles.divider, { backgroundColor: colors.border }]} />
-            <Text style={[styles.dividerText, { color: colors.icon }]}>o</Text>
-            <View style={[styles.divider, { backgroundColor: colors.border }]} />
-          </View>
-
-          {/* Social Login Buttons */}
-          <TouchableOpacity
-            style={[styles.socialButton, { 
-              borderColor: colors.border,
-              backgroundColor: colors.card
-            }]}
-          >
-            <IconSymbol name="globe" size={24} color={colors.text} />
-            <Text style={[styles.socialButtonText, { color: colors.text }]}>
-              Continuar con Google
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.socialButton, { 
-              borderColor: colors.border,
-              backgroundColor: colors.card
-            }]}
-          >
-            <IconSymbol name="applelogo" size={24} color={colors.text} />
-            <Text style={[styles.socialButtonText, { color: colors.text }]}>
-              Continuar con Apple
-            </Text>
-          </TouchableOpacity>
         </View>
 
         {/* Register Section */}
@@ -373,16 +342,6 @@ export default function LoginScreen() {
             </Text>
           </TouchableOpacity>
         </View>
-
-        {/* Guest Access */}
-        <TouchableOpacity 
-          style={styles.guestContainer}
-          onPress={() => router.replace('/(tabs)')}
-        >
-          <Text style={[styles.guestText, { color: colors.icon }]}>
-            Continuar como invitado
-          </Text>
-        </TouchableOpacity>
       </ScrollView>
     </KeyboardAvoidingView>
     </>
@@ -477,33 +436,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
-  dividerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 24,
-  },
-  divider: {
-    flex: 1,
-    height: 1,
-  },
-  dividerText: {
-    marginHorizontal: 16,
-    fontSize: 14,
-  },
-  socialButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingVertical: 12,
-    marginBottom: 12,
-  },
-  socialButtonText: {
-    fontSize: 16,
-    fontWeight: '500',
-    marginLeft: 12,
-  },
+
   registerContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
@@ -516,14 +449,5 @@ const styles = StyleSheet.create({
   registerLink: {
     fontSize: 14,
     fontWeight: '600',
-  },
-  guestContainer: {
-    alignItems: 'center',
-    marginTop: 16,
-    paddingVertical: 12,
-  },
-  guestText: {
-    fontSize: 14,
-    textDecorationLine: 'underline',
   },
 });

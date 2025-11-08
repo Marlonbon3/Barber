@@ -6,8 +6,9 @@ import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { supabase } from '@/utils/database';
 import { router, Stack } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { supabase } from '@/utils/database';
 import { useAuth } from '@/components/auth/AuthContext';
@@ -24,6 +25,7 @@ export default function BookAppointmentScreen() {
   const [customerName, setCustomerName] = useState<string>('');
   const [customerPhone, setCustomerPhone] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
+  const [occupiedTimes, setOccupiedTimes] = useState<string[]>([]);
 
   const services = [
     {
@@ -144,6 +146,62 @@ export default function BookAppointmentScreen() {
     }
   };
 
+  // useEffect para consultar horas ocupadas cuando cambien fecha o barbero
+  useEffect(() => {
+    const loadOccupiedTimes = async () => {
+      if (selectedDate && selectedBarber) {
+        console.log('🔍 Consultando horas ocupadas para:', { selectedDate, barberId: selectedBarber.id });
+        const occupied = await fetchOccupiedTimes(selectedDate, selectedBarber.id);
+        console.log('⏰ Horas ocupadas encontradas:', occupied);
+        setOccupiedTimes(occupied);
+      } else {
+        setOccupiedTimes([]);
+      }
+    };
+
+    loadOccupiedTimes();
+  }, [selectedDate, selectedBarber]);
+
+  // Función para consultar horas ocupadas
+  const fetchOccupiedTimes = async (date: string, barberId: string) => {
+    const formatDateForDB = (date: string) => {
+      const parts = date.split(', ')[1].split(' ');
+      const day = parts[0];
+      const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 
+                          'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+      const monthIndex = monthNames.indexOf(parts[1]);
+      const year = new Date().getFullYear();
+      return `${year}-${(monthIndex + 1).toString().padStart(2, '0')}-${day.padStart(2, '0')}`; // Formato YYYY-MM-DD
+    };
+
+    const formattedDate = formatDateForDB(date);
+    
+    console.log('📅 Fecha formateada para consulta:', formattedDate);
+    console.log('👨‍💼 ID del barbero:', barberId);
+    
+    const { data, error } = await supabase
+      .from('appointments')
+      .select('time')
+      .eq('date', formattedDate)
+      .eq('barber_id', barberId)
+      .neq('status', 'cancelled'); // Excluir citas canceladas
+    
+    if (error) {
+      console.error('❌ Error al consultar horas ocupadas:', error);
+      return [];
+    }
+    
+    console.log('📊 Datos de la consulta:', data);
+    return data?.map(appointment => appointment.time) || [];
+  };
+
+  // Filtrar horarios disponibles
+  const availableTimeSlots = timeSlots.filter(time => !occupiedTimes.includes(time));
+  
+  console.log('🕐 Horarios totales:', timeSlots);
+  console.log('🚫 Horarios ocupados:', occupiedTimes);
+  console.log('✅ Horarios disponibles:', availableTimeSlots);
+
   const handleNext = () => {
     if (step < 4) {
       setStep(step + 1);
@@ -168,29 +226,6 @@ export default function BookAppointmentScreen() {
       Alert.alert('Error', 'El teléfono debe tener exactamente 10 dígitos');
       return;
     }
-
-    // Intentar insertar la cita en la base de datos (Supabase)
-    try {
-      const scheduledAt = new Date();
-      // Nota: No convertimos selectedDate text a timestamp exacto aquí; guardamos scheduled_at como now()
-      const { error } = await supabase.from('appointments').insert([{
-        user_id: user?.id ?? null,
-        client: customerName,
-        service: selectedService?.name ?? null,
-        barber: selectedBarber?.name ?? null,
-        scheduled_at: scheduledAt.toISOString(),
-        time: selectedTime,
-        date: selectedDate,
-        status: 'pending',
-        price: String(selectedService?.price ?? ''),
-        notes: notes,
-      }]).select();
-
-      if (error) {
-        console.error('Error creating appointment', error);
-        Alert.alert('Error', 'No se pudo crear la cita: ' + (error.message ?? JSON.stringify(error)));
-        return;
-      }
 
       Alert.alert(
         'Cita Agendada',
@@ -362,7 +397,7 @@ export default function BookAppointmentScreen() {
 
               <Text style={[styles.sectionLabel, { color: colors.text }]}>Hora disponible</Text>
               <View style={styles.timeGrid}>
-                {timeSlots.map((time) => (
+                {availableTimeSlots.map((time) => (
                   <TouchableOpacity
                     key={time}
                     style={[
@@ -382,6 +417,13 @@ export default function BookAppointmentScreen() {
                     </Text>
                   </TouchableOpacity>
                 ))}
+                {availableTimeSlots.length === 0 && selectedDate && selectedBarber && (
+                  <View style={styles.noTimesContainer}>
+                    <Text style={[styles.noTimesText, { color: colors.icon }]}>
+                      No hay horarios disponibles para esta fecha y barbero.
+                    </Text>
+                  </View>
+                )}
               </View>
             </ScrollView>
           </ThemedView>
@@ -726,5 +768,16 @@ const styles = StyleSheet.create({
   },
   fullWidthButton: {
     marginHorizontal: 0,
+  },
+  noTimesContainer: {
+    width: '100%',
+    padding: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  noTimesText: {
+    fontSize: 16,
+    textAlign: 'center',
+    fontStyle: 'italic',
   },
 });

@@ -1,5 +1,6 @@
-import { Dimensions, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Dimensions, Image, Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
+import { useAuth } from '@/components/auth/AuthContext';
 import { CustomButton } from '@/components/barberia/CustomButton';
 import ParallaxScrollView from '@/components/parallax-scroll-view';
 import { ThemedText } from '@/components/themed-text';
@@ -13,6 +14,7 @@ export default function HomeScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const router = useRouter();
+  const { signOut, user } = useAuth();
 
   // Variables responsive
   const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -56,6 +58,42 @@ export default function HomeScreen() {
     },
   ];
 
+  const handleLogout = () => {
+    Alert.alert(
+      'Cerrar Sesión',
+      '¿Estás seguro que deseas cerrar sesión?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { 
+          text: 'Cerrar Sesión', 
+          style: 'destructive',
+          onPress: () => {
+            signOut();
+            router.replace('/login');
+          }
+        }
+      ]
+    );
+  };
+
+  const handleFacebookPress = () => {
+    const facebookUrl = 'https://www.facebook.com/profile.php?id=100041258745075';
+    Linking.openURL(facebookUrl).catch(() => {
+      Alert.alert('Error', 'No se pudo abrir la página de Facebook');
+    });
+  };
+
+  const handleLocationPress = () => {
+    // Usar coordenadas GPS exactas para mayor precisión
+    const latitude = 32.449799;
+    const longitude = -114.740839;
+    const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`;
+    
+    Linking.openURL(mapsUrl).catch(() => {
+      Alert.alert('Error', 'No se pudo abrir la ubicación en mapas');
+    });
+  };
+
   return (
     <ParallaxScrollView
       headerBackgroundColor={{ light: colors.background, dark: colors.background }}
@@ -66,10 +104,16 @@ export default function HomeScreen() {
           paddingHorizontal: responsiveSize.horizontalPadding
         }]}>
           <View style={styles.heroIconWrapper}>
-            <IconSymbol
-              size={responsiveSize.heroIconSize}
-              name="scissors"
-              color={colorScheme === 'dark' ? colors.background : '#2C1810'}
+            <Image
+              source={require('@/assets/images/jaime.jpg')}
+              style={[styles.heroImage, {
+                width: responsiveSize.heroIconSize,
+                height: responsiveSize.heroIconSize,
+                borderRadius: responsiveSize.heroIconSize / 2,
+                borderWidth: 3,
+                borderColor: colorScheme === 'dark' ? colors.background : '#2C1810',
+              }]}
+              resizeMode="cover"
             />
             <View style={[styles.decorativeCircle, { 
               borderColor: colorScheme === 'dark' ? colors.background : '#2C1810',
@@ -85,11 +129,11 @@ export default function HomeScreen() {
               color: colorScheme === 'dark' ? colors.background : '#2C1810',
               fontSize: responsiveSize.heroTitleSize
             }]}>
-              BarberLine
+              BarberJaime653
             </Text>
             <View style={[styles.titleUnderline, { backgroundColor: colorScheme === 'dark' ? colors.background : '#2C1810' }]} />
             <Text style={[styles.heroSubtitle, { color: colorScheme === 'dark' ? colors.background : '#2C1810' }]}>
-              Estilo y tradición desde 1985
+              Estilo y tradición
             </Text>
           </View>
         </View>
@@ -99,7 +143,9 @@ export default function HomeScreen() {
         paddingHorizontal: responsiveSize.horizontalPadding
       }]}>
         <View style={styles.welcomeHeader}>
-          <ThemedText type="title" style={styles.welcomeTitle}>Bienvenido</ThemedText>
+          <ThemedText type="title" style={styles.welcomeTitle}>
+            Bienvenido{user?.email ? `, ${user.email.split('@')[0]}` : ''}
+          </ThemedText>
         </View>
       </ThemedView>
       
@@ -117,7 +163,7 @@ export default function HomeScreen() {
             fontSize: isSmallDevice ? 14 : 16
           }]}>
             Descubre la experiencia única de nuestra barbería. Ofrecemos servicios de corte de cabello, 
-            arreglo de barba y cuidado personal con más de 35 años de experiencia.
+            arreglo de barba y cuidado personal con más de 6 años de experiencia.
           </ThemedText>
         </View>
       </ThemedView>
@@ -160,7 +206,7 @@ export default function HomeScreen() {
               numberOfLines={1}
               adjustsFontSizeToFit
             >
-              9:00 AM - 7:00 PM
+              10:00 AM - 11:00 PM
             </ThemedText>
           </View>
           <View style={[styles.hoursDivider, { backgroundColor: colors.border }]} />
@@ -175,7 +221,7 @@ export default function HomeScreen() {
               numberOfLines={1}
               adjustsFontSizeToFit
             >
-              Sábados
+              Sábados - Domingos
             </ThemedText>
             <ThemedText 
               style={[styles.timeText, { 
@@ -187,34 +233,7 @@ export default function HomeScreen() {
               numberOfLines={1}
               adjustsFontSizeToFit
             >
-              8:00 AM - 6:00 PM
-            </ThemedText>
-          </View>
-          <View style={[styles.hoursDivider, { backgroundColor: colors.border }]} />
-          <View style={[styles.hoursRow, {
-            paddingVertical: isSmallDevice ? 8 : 12
-          }]}>
-            <ThemedText 
-              style={[styles.dayText, {
-                fontSize: isSmallDevice ? 12 : isMediumDevice ? 14 : 16,
-                flex: 1
-              }]}
-              numberOfLines={1}
-              adjustsFontSizeToFit
-            >
-              Domingos
-            </ThemedText>
-            <ThemedText 
-              style={[styles.timeText, { 
-                color: colors.secondary,
-                fontSize: isSmallDevice ? 12 : isMediumDevice ? 14 : 16,
-                flex: 1,
-                textAlign: 'right'
-              }]}
-              numberOfLines={1}
-              adjustsFontSizeToFit
-            >
-              Cerrado
+              10:00 AM - 7:00 PM
             </ThemedText>
           </View>
         </View>
@@ -285,7 +304,7 @@ export default function HomeScreen() {
         paddingHorizontal: responsiveSize.horizontalPadding
       }]}>
         <View style={styles.sectionHeader}>
-          <IconSymbol name="phone.fill" size={24} color={colors.primary} />
+          <IconSymbol name="bubble.left.and.bubble.right.fill" size={24} color={colors.primary} />
           <ThemedText type="subtitle" style={styles.contactTitle}>
             Contacto
           </ThemedText>
@@ -297,9 +316,12 @@ export default function HomeScreen() {
           padding: responsiveSize.cardPadding
         }]}>
           <View style={styles.contactInfo}>
-            <TouchableOpacity style={[styles.contactRow, {
-              paddingVertical: isSmallDevice ? 8 : 12
-            }]}>
+            <TouchableOpacity 
+              style={[styles.contactRow, {
+                paddingVertical: isSmallDevice ? 8 : 12
+              }]}
+              onPress={handleFacebookPress}
+            >
               <View style={[styles.contactIconWrapper, { 
                 backgroundColor: colors.primary + '15',
                 width: responsiveSize.contactIconSize,
@@ -307,23 +329,26 @@ export default function HomeScreen() {
                 borderRadius: responsiveSize.contactIconSize / 2,
                 marginRight: isSmallDevice ? 12 : 16
               }]}>
-                <IconSymbol name="phone.fill" size={20} color={colors.primary} />
+                <IconSymbol name="globe" size={20} color={colors.primary} />
               </View>
               <View style={styles.contactTextContainer}>
                 <ThemedText style={[styles.contactLabel, {
                   fontSize: isSmallDevice ? 10 : 12
-                }]}>Teléfono</ThemedText>
+                }]}>Facebook</ThemedText>
                 <ThemedText style={[styles.contactText, {
                   fontSize: isSmallDevice ? 14 : 16
-                }]}>+1 (555) 123-4567</ThemedText>
+                }]}>Visita nuestra página</ThemedText>
               </View>
             </TouchableOpacity>
             
             <View style={[styles.contactDivider, { backgroundColor: colors.border }]} />
             
-            <TouchableOpacity style={[styles.contactRow, {
-              paddingVertical: isSmallDevice ? 8 : 12
-            }]}>
+            <TouchableOpacity 
+              style={[styles.contactRow, {
+                paddingVertical: isSmallDevice ? 8 : 12
+              }]}
+              onPress={handleLocationPress}
+            >
               <View style={[styles.contactIconWrapper, { 
                 backgroundColor: colors.primary + '15',
                 width: responsiveSize.contactIconSize,
@@ -339,38 +364,14 @@ export default function HomeScreen() {
                 }]}>Dirección</ThemedText>
                 <ThemedText style={[styles.contactText, {
                   fontSize: isSmallDevice ? 14 : 16
-                }]}>123 Calle Principal, Ciudad</ThemedText>
-              </View>
-            </TouchableOpacity>
-            
-            <View style={[styles.contactDivider, { backgroundColor: colors.border }]} />
-            
-            <TouchableOpacity style={[styles.contactRow, {
-              paddingVertical: isSmallDevice ? 8 : 12
-            }]}>
-              <View style={[styles.contactIconWrapper, { 
-                backgroundColor: colors.primary + '15',
-                width: responsiveSize.contactIconSize,
-                height: responsiveSize.contactIconSize,
-                borderRadius: responsiveSize.contactIconSize / 2,
-                marginRight: isSmallDevice ? 12 : 16
-              }]}>
-                <IconSymbol name="envelope.fill" size={20} color={colors.primary} />
-              </View>
-              <View style={styles.contactTextContainer}>
-                <ThemedText style={[styles.contactLabel, {
-                  fontSize: isSmallDevice ? 10 : 12
-                }]}>Email</ThemedText>
-                <ThemedText style={[styles.contactText, {
-                  fontSize: isSmallDevice ? 14 : 16
-                }]}>info@barberhub.com</ThemedText>
+                }]}>Callejón Chihuahua entre 38 y 39</ThemedText>
               </View>
             </TouchableOpacity>
           </View>
           
           <CustomButton
-            title="Llamar Ahora"
-            onPress={() => {}}
+            title="Visitar Facebook"
+            onPress={handleFacebookPress}
             variant="primary"
             style={styles.callButton}
           />
@@ -394,28 +395,49 @@ export default function HomeScreen() {
           borderColor: colors.border,
           padding: responsiveSize.cardPadding
         }]}>
-          <ThemedText style={[styles.loginDescription, { 
-            color: colors.icon,
-            fontSize: isSmallDevice ? 14 : 16,
-            marginBottom: responsiveSize.cardPadding
-          }]}>
-            Inicia sesión para acceder a todas las funciones y gestionar tus citas
-          </ThemedText>
-          
-          <View style={styles.loginButtons}>
-            <CustomButton
-              title="Iniciar Sesión"
-              onPress={() => router.push('/login')}
-              variant="primary"
-              style={styles.loginButton}
-            />
-            <CustomButton
-              title="Registrarse"
-              onPress={() => router.push('/register')}
-              variant="outline"
-              style={styles.loginButton}
-            />
-          </View>
+          {user ? (
+            <>
+              <ThemedText style={[styles.loginDescription, { 
+                color: colors.icon,
+                fontSize: isSmallDevice ? 14 : 16,
+                marginBottom: responsiveSize.cardPadding
+              }]}>
+                Sesión iniciada como: {user.email}
+              </ThemedText>
+              
+              <CustomButton
+                title="Cerrar Sesión"
+                onPress={handleLogout}
+                variant="outline"
+                style={styles.logoutButtonFull}
+              />
+            </>
+          ) : (
+            <>
+              <ThemedText style={[styles.loginDescription, { 
+                color: colors.icon,
+                fontSize: isSmallDevice ? 14 : 16,
+                marginBottom: responsiveSize.cardPadding
+              }]}>
+                Inicia sesión para acceder a todas las funciones y gestionar tus citas
+              </ThemedText>
+              
+              <View style={styles.loginButtons}>
+                <CustomButton
+                  title="Iniciar Sesión"
+                  onPress={() => router.push('/login')}
+                  variant="primary"
+                  style={styles.loginButton}
+                />
+                <CustomButton
+                  title="Registrarse"
+                  onPress={() => router.push('/register')}
+                  variant="outline"
+                  style={styles.loginButton}
+                />
+              </View>
+            </>
+          )}
         </View>
       </ThemedView>
     </ParallaxScrollView>
@@ -431,6 +453,9 @@ const styles = StyleSheet.create({
   heroIconWrapper: {
     position: 'relative',
     marginBottom: 20,
+  },
+  heroImage: {
+    // Estilos dinámicos aplicados inline
   },
   decorativeCircle: {
     position: 'absolute',
@@ -464,11 +489,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
   },
   welcomeTitle: {
     textAlign: 'center',
   },
+
   welcomeContainer: {
     // Valores dinámicos aplicados inline
   },
@@ -655,5 +680,8 @@ const styles = StyleSheet.create({
   },
   loginButton: {
     flex: 1,
+  },
+  logoutButtonFull: {
+    width: '100%',
   },
 });
