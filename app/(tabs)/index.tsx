@@ -1,5 +1,6 @@
-import { Dimensions, StyleSheet, Text, TouchableOpacity, View, Alert } from 'react-native';
+import { Alert, Dimensions, Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
+import { useAuth } from '@/components/auth/AuthContext';
 import { CustomButton } from '@/components/barberia/CustomButton';
 import ParallaxScrollView from '@/components/parallax-scroll-view';
 import { ThemedText } from '@/components/themed-text';
@@ -8,7 +9,6 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useRouter } from 'expo-router';
-import { useAuth } from '@/components/auth/AuthContext';
 
 export default function HomeScreen() {
   const colorScheme = useColorScheme();
@@ -74,6 +74,23 @@ export default function HomeScreen() {
         }
       ]
     );
+  };
+
+  const handleFacebookPress = () => {
+    const facebookUrl = 'https://www.facebook.com/profile.php?id=100041258745075';
+    Linking.openURL(facebookUrl).catch(() => {
+      Alert.alert('Error', 'No se pudo abrir la página de Facebook');
+    });
+  };
+
+  const handleLocationPress = () => {
+    const address = 'Callejón Chihuahua 38 y 39';
+    const encodedAddress = encodeURIComponent(address);
+    const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodedAddress}`;
+    
+    Linking.openURL(mapsUrl).catch(() => {
+      Alert.alert('Error', 'No se pudo abrir la ubicación en mapas');
+    });
   };
 
   return (
@@ -307,7 +324,7 @@ export default function HomeScreen() {
         paddingHorizontal: responsiveSize.horizontalPadding
       }]}>
         <View style={styles.sectionHeader}>
-          <IconSymbol name="phone.fill" size={24} color={colors.primary} />
+          <IconSymbol name="bubble.left.and.bubble.right.fill" size={24} color={colors.primary} />
           <ThemedText type="subtitle" style={styles.contactTitle}>
             Contacto
           </ThemedText>
@@ -319,9 +336,12 @@ export default function HomeScreen() {
           padding: responsiveSize.cardPadding
         }]}>
           <View style={styles.contactInfo}>
-            <TouchableOpacity style={[styles.contactRow, {
-              paddingVertical: isSmallDevice ? 8 : 12
-            }]}>
+            <TouchableOpacity 
+              style={[styles.contactRow, {
+                paddingVertical: isSmallDevice ? 8 : 12
+              }]}
+              onPress={handleFacebookPress}
+            >
               <View style={[styles.contactIconWrapper, { 
                 backgroundColor: colors.primary + '15',
                 width: responsiveSize.contactIconSize,
@@ -329,23 +349,26 @@ export default function HomeScreen() {
                 borderRadius: responsiveSize.contactIconSize / 2,
                 marginRight: isSmallDevice ? 12 : 16
               }]}>
-                <IconSymbol name="phone.fill" size={20} color={colors.primary} />
+                <IconSymbol name="globe" size={20} color={colors.primary} />
               </View>
               <View style={styles.contactTextContainer}>
                 <ThemedText style={[styles.contactLabel, {
                   fontSize: isSmallDevice ? 10 : 12
-                }]}>Teléfono</ThemedText>
+                }]}>Facebook</ThemedText>
                 <ThemedText style={[styles.contactText, {
                   fontSize: isSmallDevice ? 14 : 16
-                }]}>+1 (555) 123-4567</ThemedText>
+                }]}>Visita nuestra página</ThemedText>
               </View>
             </TouchableOpacity>
             
             <View style={[styles.contactDivider, { backgroundColor: colors.border }]} />
             
-            <TouchableOpacity style={[styles.contactRow, {
-              paddingVertical: isSmallDevice ? 8 : 12
-            }]}>
+            <TouchableOpacity 
+              style={[styles.contactRow, {
+                paddingVertical: isSmallDevice ? 8 : 12
+              }]}
+              onPress={handleLocationPress}
+            >
               <View style={[styles.contactIconWrapper, { 
                 backgroundColor: colors.primary + '15',
                 width: responsiveSize.contactIconSize,
@@ -361,38 +384,14 @@ export default function HomeScreen() {
                 }]}>Dirección</ThemedText>
                 <ThemedText style={[styles.contactText, {
                   fontSize: isSmallDevice ? 14 : 16
-                }]}>123 Calle Principal, Ciudad</ThemedText>
-              </View>
-            </TouchableOpacity>
-            
-            <View style={[styles.contactDivider, { backgroundColor: colors.border }]} />
-            
-            <TouchableOpacity style={[styles.contactRow, {
-              paddingVertical: isSmallDevice ? 8 : 12
-            }]}>
-              <View style={[styles.contactIconWrapper, { 
-                backgroundColor: colors.primary + '15',
-                width: responsiveSize.contactIconSize,
-                height: responsiveSize.contactIconSize,
-                borderRadius: responsiveSize.contactIconSize / 2,
-                marginRight: isSmallDevice ? 12 : 16
-              }]}>
-                <IconSymbol name="envelope.fill" size={20} color={colors.primary} />
-              </View>
-              <View style={styles.contactTextContainer}>
-                <ThemedText style={[styles.contactLabel, {
-                  fontSize: isSmallDevice ? 10 : 12
-                }]}>Email</ThemedText>
-                <ThemedText style={[styles.contactText, {
-                  fontSize: isSmallDevice ? 14 : 16
-                }]}>info@barberhub.com</ThemedText>
+                }]}>Callejón Chihuahua 38 y 39, SLRC</ThemedText>
               </View>
             </TouchableOpacity>
           </View>
           
           <CustomButton
-            title="Llamar Ahora"
-            onPress={() => {}}
+            title="Visitar Facebook"
+            onPress={handleFacebookPress}
             variant="primary"
             style={styles.callButton}
           />
