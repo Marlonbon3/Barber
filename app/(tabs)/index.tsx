@@ -84,9 +84,10 @@ export default function HomeScreen() {
   };
 
   const handleLocationPress = () => {
-    const address = 'Callejón Chihuahua 38 y 39';
-    const encodedAddress = encodeURIComponent(address);
-    const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodedAddress}`;
+    // Usar coordenadas GPS exactas para mayor precisión
+    const latitude = 32.449799;
+    const longitude = -114.740839;
+    const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`;
     
     Linking.openURL(mapsUrl).catch(() => {
       Alert.alert('Error', 'No se pudo abrir la ubicación en mapas');
@@ -363,7 +364,7 @@ export default function HomeScreen() {
                 }]}>Dirección</ThemedText>
                 <ThemedText style={[styles.contactText, {
                   fontSize: isSmallDevice ? 14 : 16
-                }]}>Callejón Chihuahua 38 y 39, SLRC</ThemedText>
+                }]}>Callejón Chihuahua entre 38 y 39</ThemedText>
               </View>
             </TouchableOpacity>
           </View>
