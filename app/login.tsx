@@ -145,44 +145,6 @@ export default function LoginScreen() {
     return emailRegex.test(email);
   };
 
-  const handleForgotPassword = async () => {
-    if (!email.trim()) {
-      Alert.alert('Error', 'Por favor ingresa tu email');
-      return;
-    }
-
-    if (!isValidEmail(email)) {
-      Alert.alert('Error', 'Por favor ingresa un email válido');
-      return;
-    }
-
-    Alert.alert(
-      'Recuperar Contraseña',
-      'Se enviará un enlace de recuperación a tu email registrado',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        { 
-          text: 'Enviar',
-          onPress: async () => {
-            try {
-              const { error } = await supabase.auth.resetPasswordForEmail(email);
-              if (error) throw error;
-              Alert.alert(
-                'Enlace Enviado',
-                'Por favor revisa tu email para resetear tu contraseña'
-              );
-            } catch (error: any) {
-              Alert.alert(
-                'Error',
-                'No se pudo enviar el enlace de recuperación'
-              );
-            }
-          }
-        }
-      ]
-    );
-  };
-
   const handleRegister = () => {
     router.push('/register');
   };
@@ -305,13 +267,6 @@ export default function LoginScreen() {
             </View>
           </View>
 
-          {/* Forgot Password */}
-          <TouchableOpacity onPress={handleForgotPassword} style={styles.forgotContainer}>
-            <Text style={[styles.forgotText, { color: colors.primary }]}>
-              ¿Olvidaste tu contraseña?
-            </Text>
-          </TouchableOpacity>
-
           {/* Login Button */}
           <TouchableOpacity
             style={[styles.loginButton, { 
@@ -409,14 +364,6 @@ const styles = StyleSheet.create({
   },
   eyeIcon: {
     padding: 4,
-  },
-  forgotContainer: {
-    alignItems: 'flex-end',
-    marginBottom: 8,
-  },
-  forgotText: {
-    fontSize: 14,
-    fontWeight: '500',
   },
   loginButton: {
     borderRadius: 12,
