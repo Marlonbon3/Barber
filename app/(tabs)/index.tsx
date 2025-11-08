@@ -1,4 +1,4 @@
-import { Dimensions, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Dimensions, StyleSheet, Text, TouchableOpacity, View, Alert } from 'react-native';
 
 import { CustomButton } from '@/components/barberia/CustomButton';
 import ParallaxScrollView from '@/components/parallax-scroll-view';
@@ -8,11 +8,13 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useRouter } from 'expo-router';
+import { useAuth } from '@/components/auth/AuthContext';
 
 export default function HomeScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const router = useRouter();
+  const { signOut, user } = useAuth();
 
   // Variables responsive
   const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -55,6 +57,24 @@ export default function HomeScreen() {
       color: colors.primary,
     },
   ];
+
+  const handleLogout = () => {
+    Alert.alert(
+      'Cerrar Sesión',
+      '¿Estás seguro que deseas cerrar sesión?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { 
+          text: 'Cerrar Sesión', 
+          style: 'destructive',
+          onPress: () => {
+            signOut();
+            router.replace('/login');
+          }
+        }
+      ]
+    );
+  };
 
   return (
     <ParallaxScrollView
@@ -99,7 +119,9 @@ export default function HomeScreen() {
         paddingHorizontal: responsiveSize.horizontalPadding
       }]}>
         <View style={styles.welcomeHeader}>
-          <ThemedText type="title" style={styles.welcomeTitle}>Bienvenido</ThemedText>
+          <ThemedText type="title" style={styles.welcomeTitle}>
+            Bienvenido{user?.email ? `, ${user.email.split('@')[0]}` : ''}
+          </ThemedText>
         </View>
       </ThemedView>
       
@@ -394,28 +416,49 @@ export default function HomeScreen() {
           borderColor: colors.border,
           padding: responsiveSize.cardPadding
         }]}>
-          <ThemedText style={[styles.loginDescription, { 
-            color: colors.icon,
-            fontSize: isSmallDevice ? 14 : 16,
-            marginBottom: responsiveSize.cardPadding
-          }]}>
-            Inicia sesión para acceder a todas las funciones y gestionar tus citas
-          </ThemedText>
-          
-          <View style={styles.loginButtons}>
-            <CustomButton
-              title="Iniciar Sesión"
-              onPress={() => router.push('/login')}
-              variant="primary"
-              style={styles.loginButton}
-            />
-            <CustomButton
-              title="Registrarse"
-              onPress={() => router.push('/register')}
-              variant="outline"
-              style={styles.loginButton}
-            />
-          </View>
+          {user ? (
+            <>
+              <ThemedText style={[styles.loginDescription, { 
+                color: colors.icon,
+                fontSize: isSmallDevice ? 14 : 16,
+                marginBottom: responsiveSize.cardPadding
+              }]}>
+                Sesión iniciada como: {user.email}
+              </ThemedText>
+              
+              <CustomButton
+                title="Cerrar Sesión"
+                onPress={handleLogout}
+                variant="outline"
+                style={styles.logoutButtonFull}
+              />
+            </>
+          ) : (
+            <>
+              <ThemedText style={[styles.loginDescription, { 
+                color: colors.icon,
+                fontSize: isSmallDevice ? 14 : 16,
+                marginBottom: responsiveSize.cardPadding
+              }]}>
+                Inicia sesión para acceder a todas las funciones y gestionar tus citas
+              </ThemedText>
+              
+              <View style={styles.loginButtons}>
+                <CustomButton
+                  title="Iniciar Sesión"
+                  onPress={() => router.push('/login')}
+                  variant="primary"
+                  style={styles.loginButton}
+                />
+                <CustomButton
+                  title="Registrarse"
+                  onPress={() => router.push('/register')}
+                  variant="outline"
+                  style={styles.loginButton}
+                />
+              </View>
+            </>
+          )}
         </View>
       </ThemedView>
     </ParallaxScrollView>
@@ -464,11 +507,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
   },
   welcomeTitle: {
     textAlign: 'center',
   },
+
   welcomeContainer: {
     // Valores dinámicos aplicados inline
   },
@@ -655,5 +698,8 @@ const styles = StyleSheet.create({
   },
   loginButton: {
     flex: 1,
+  },
+  logoutButtonFull: {
+    width: '100%',
   },
 });
