@@ -114,20 +114,11 @@ export default function LoginScreen() {
         console.error('Error setting role in context:', err);
       }
       
-      Alert.alert(
-        'Inicio de Sesión Exitoso',
-        '¡Bienvenido a BarberLine!',
-        [{ 
-          text: 'Continuar', 
-          onPress: () => {
-            if (isBarber) {
-              router.replace('/admin');
-            } else {
-              router.replace('/(tabs)');
-            }
-          }
-        }]
-      );
+      if (isBarber) {
+        router.replace('/admin');
+      } else {
+        router.replace('/(tabs)');
+      }
     } catch (error: any) {
       console.error('Login error:', error);
       setIsLoading(false);
