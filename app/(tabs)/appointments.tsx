@@ -7,14 +7,24 @@ import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+
+interface Appointment {
+  id: string;
+  service: string;
+  barber: string;
+  date: string;
+  time: string;
+  price: number;
+  status: 'confirmed' | 'pending' | 'completed' | 'cancelled';
+}
 
 export default function AppointmentsScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   
-  // Estado simulado de citas
-  const [appointments] = useState([
+  // Estado de citas
+  const [appointments, setAppointments] = useState<Appointment[]>([
     {
       id: '1',
       service: 'Corte Moderno',
@@ -44,17 +54,110 @@ export default function AppointmentsScreen() {
     },
   ]);
 
+  // Estado para el modal de edición
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null);
+  const [selectedDate, setSelectedDate] = useState('');
+  const [selectedTime, setSelectedTime] = useState('');
+
+  // Días disponibles (próximos 14 días)
+  const availableDates = [
+    'Lunes, 11 Nov',
+    'Martes, 12 Nov', 
+    'Miércoles, 13 Nov',
+    'Jueves, 14 Nov',
+    'Viernes, 15 Nov',
+    'Sábado, 16 Nov',
+    'Lunes, 18 Nov',
+    'Martes, 19 Nov',
+    'Miércoles, 20 Nov',
+    'Jueves, 21 Nov',
+    'Viernes, 22 Nov',
+    'Sábado, 23 Nov',
+  ];
+
+  // Horarios disponibles
+  const availableTimes = [
+    '9:00 AM',
+    '10:00 AM',
+    '11:00 AM',
+    '12:00 PM',
+    '1:00 PM',
+    '2:00 PM',
+    '3:00 PM',
+    '4:00 PM',
+    '5:00 PM',
+    '6:00 PM',
+  ];
+
   const upcomingAppointments = appointments.filter(apt => apt.status === 'confirmed');
   const pastAppointments = appointments.filter(apt => apt.status === 'completed');
 
   const handleEditAppointment = (appointmentId: string) => {
-    console.log('Editar cita:', appointmentId);
-    // Aquí iría la lógica para editar la cita
+    const appointment = appointments.find(apt => apt.id === appointmentId);
+    if (appointment) {
+      setEditingAppointment(appointment);
+      setSelectedDate(appointment.date);
+      setSelectedTime(appointment.time);
+      setEditModalVisible(true);
+    }
+  };
+
+  const handleSaveEdit = () => {
+    if (!editingAppointment || !selectedDate || !selectedTime) {
+      Alert.alert('Error', 'Por favor selecciona fecha y hora');
+      return;
+    }
+
+    setAppointments(prev => prev.map(apt => 
+      apt.id === editingAppointment.id 
+        ? { ...apt, date: selectedDate, time: selectedTime }
+        : apt
+    ));
+
+    setEditModalVisible(false);
+    setEditingAppointment(null);
+    setSelectedDate('');
+    setSelectedTime('');
+    
+    Alert.alert('Éxito', 'Cita actualizada correctamente');
+  };
+
+  const handleCancelEdit = () => {
+    setEditModalVisible(false);
+    setEditingAppointment(null);
+    setSelectedDate('');
+    setSelectedTime('');
+  };
+
+  const confirmCancellation = (appointmentId: string) => {
+    setAppointments(prev => prev.map(apt => 
+      apt.id === appointmentId 
+        ? { ...apt, status: 'cancelled' as const }
+        : apt
+    ));
+    Alert.alert('Cita Cancelada', 'Tu cita ha sido cancelada exitosamente');
   };
 
   const handleCancelAppointment = (appointmentId: string) => {
-    console.log('Cancelar cita:', appointmentId);
-    // Aquí iría la lógica para cancelar la cita
+    const appointment = appointments.find(apt => apt.id === appointmentId);
+    if (!appointment) return;
+
+    Alert.alert(
+      'Cancelar Cita',
+      `¿Estás seguro que deseas cancelar tu cita de ${appointment.service} el ${appointment.date} a las ${appointment.time}?`,
+      [
+        {
+          text: 'No',
+          style: 'cancel',
+        },
+        {
+          text: 'Sí, Cancelar',
+          style: 'destructive',
+          onPress: () => confirmCancellation(appointmentId),
+        },
+      ]
+    );
   };
 
   const handleScheduleNew = () => {
@@ -171,6 +274,112 @@ export default function AppointmentsScreen() {
           </View>
         </ThemedView>
       </ScrollView>
+
+      {/* Modal de edición */}
+      <Modal
+        visible={editModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={handleCancelEdit}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>
+              Editar Cita
+            </Text>
+            
+            {editingAppointment && (
+              <View style={styles.appointmentInfo}>
+                <Text style={[styles.appointmentService, { color: colors.text }]}>
+                  {editingAppointment.service}
+                </Text>
+                <Text style={[styles.appointmentBarber, { color: colors.icon }]}>
+                  con {editingAppointment.barber}
+                </Text>
+              </View>
+            )}
+
+            <View style={styles.inputGroup}>
+              <Text style={[styles.inputLabel, { color: colors.text }]}>
+                Selecciona una fecha
+              </Text>
+              <ScrollView 
+                style={styles.optionsContainer}
+                showsVerticalScrollIndicator={false}
+              >
+                {availableDates.map((date) => (
+                  <TouchableOpacity
+                    key={date}
+                    style={[
+                      styles.optionButton,
+                      { 
+                        backgroundColor: selectedDate === date ? colors.primary : colors.card,
+                        borderColor: colors.border 
+                      }
+                    ]}
+                    onPress={() => setSelectedDate(date)}
+                  >
+                    <Text style={[
+                      styles.optionText,
+                      { 
+                        color: selectedDate === date ? '#fff' : colors.text 
+                      }
+                    ]}>
+                      {date}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={[styles.inputLabel, { color: colors.text }]}>
+                Selecciona una hora
+              </Text>
+              <View style={styles.timeGrid}>
+                {availableTimes.map((time) => (
+                  <TouchableOpacity
+                    key={time}
+                    style={[
+                      styles.timeButton,
+                      { 
+                        backgroundColor: selectedTime === time ? colors.primary : colors.card,
+                        borderColor: colors.border 
+                      }
+                    ]}
+                    onPress={() => setSelectedTime(time)}
+                  >
+                    <Text style={[
+                      styles.timeText,
+                      { 
+                        color: selectedTime === time ? '#fff' : colors.text 
+                      }
+                    ]}>
+                      {time}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={handleCancelEdit}
+              >
+                <Text style={styles.cancelButtonText}>Cancelar</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[styles.modalButton, styles.saveButton, { backgroundColor: colors.primary }]}
+                onPress={handleSaveEdit}
+              >
+                <Text style={styles.saveButtonText}>Guardar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ThemedView>
   );
 }
@@ -262,5 +471,115 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     marginLeft: 8,
+  },
+  // Estilos del modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    width: '90%',
+    padding: 20,
+    borderRadius: 16,
+    maxHeight: '80%',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  appointmentInfo: {
+    alignItems: 'center',
+    marginBottom: 20,
+    padding: 12,
+    backgroundColor: 'rgba(212, 175, 55, 0.1)',
+    borderRadius: 8,
+  },
+  appointmentService: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  appointmentBarber: {
+    fontSize: 14,
+  },
+  inputGroup: {
+    marginBottom: 16,
+  },
+  inputLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  input: {
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 20,
+  },
+  modalButton: {
+    flex: 1,
+    padding: 14,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  cancelButton: {
+    backgroundColor: '#f5f5f5',
+    marginRight: 8,
+  },
+  saveButton: {
+    marginLeft: 8,
+  },
+  cancelButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#666',
+  },
+  saveButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  // Estilos para los selectores
+  optionsContainer: {
+    maxHeight: 150,
+    borderWidth: 1,
+    borderRadius: 8,
+    backgroundColor: 'rgba(0,0,0,0.02)',
+  },
+  optionButton: {
+    padding: 12,
+    borderBottomWidth: 0.5,
+    borderBottomColor: 'rgba(0,0,0,0.1)',
+  },
+  optionText: {
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  timeGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    marginTop: 8,
+  },
+  timeButton: {
+    width: '30%',
+    padding: 10,
+    borderWidth: 1,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  timeText: {
+    fontSize: 14,
+    fontWeight: '500',
   },
 });

@@ -10,18 +10,18 @@ import { supabase } from '@/utils/database';
 import { router, Stack } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useAuth } from '@/components/auth/AuthContext';
 
 export default function BookAppointmentScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
+  const { user } = useAuth();
   
   const [step, setStep] = useState(1);
   const [selectedService, setSelectedService] = useState<any>(null);
   const [selectedBarber, setSelectedBarber] = useState<any>(null);
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [selectedTime, setSelectedTime] = useState<string>('');
-  const [customerName, setCustomerName] = useState<string>('');
-  const [customerPhone, setCustomerPhone] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
   const [occupiedTimes, setOccupiedTimes] = useState<string[]>([]);
 
@@ -122,20 +122,7 @@ export default function BookAppointmentScreen() {
 
   const dates = generateDates();
 
-  const handlePhoneChange = (text: string) => {
-    // Solo permitir números y limitar a 10 dígitos
-    const numericText = text.replace(/[^0-9]/g, '');
-    if (numericText.length <= 10) {
-      setCustomerPhone(numericText);
-    }
-  };
 
-  const handleNameChange = (text: string) => {
-    // Limitar a 50 caracteres para el nombre
-    if (text.length <= 50) {
-      setCustomerName(text);
-    }
-  };
 
   const handleNotesChange = (text: string) => {
     // Limitar a 200 caracteres para las notas
@@ -213,13 +200,8 @@ export default function BookAppointmentScreen() {
   };
 
   const handleBookAppointment = () => {
-    if (!customerName.trim() || !customerPhone.trim()) {
-      Alert.alert('Error', 'Por favor completa todos los campos obligatorios');
-      return;
-    }
-
-    if (customerPhone.length !== 10) {
-      Alert.alert('Error', 'El teléfono debe tener exactamente 10 dígitos');
+    if (!user) {
+      Alert.alert('Error', 'Debes iniciar sesión para agendar una cita');
       return;
     }
 
@@ -244,10 +226,11 @@ export default function BookAppointmentScreen() {
         date: appointmentDate,
         time: selectedTime,
         price: selectedService?.price,
-        customer_name: customerName,
-        customer_phone: customerPhone,
+        customer_name: user.user_metadata?.full_name || user.email || 'Usuario',
+        customer_phone: user.user_metadata?.phone || user.phone || '',
         notes: notes,
         status: 'confirmed',
+        user_id: user.id,
       };
 
       const { error } = await supabase
@@ -282,8 +265,6 @@ export default function BookAppointmentScreen() {
     setSelectedBarber(null);
     setSelectedDate('');
     setSelectedTime('');
-    setCustomerName('');
-    setCustomerPhone('');
     setNotes('');
   };
 
@@ -296,7 +277,7 @@ export default function BookAppointmentScreen() {
       case 3:
         return selectedDate !== '' && selectedTime !== '';
       case 4:
-        return customerName.trim() !== '' && customerPhone.trim() !== '' && customerPhone.length === 10;
+        return true; // Ya no necesitamos validar datos del usuario
       default:
         return false;
     }
@@ -465,7 +446,7 @@ export default function BookAppointmentScreen() {
         return (
           <ThemedView style={styles.stepContent}>
             <ThemedText type="subtitle" style={styles.stepTitle}>
-              Información del Cliente
+              Confirmar Cita
             </ThemedText>
             
             <ScrollView 
@@ -473,33 +454,19 @@ export default function BookAppointmentScreen() {
               showsVerticalScrollIndicator={false}
               contentContainerStyle={styles.scrollContent}
             >
-              <View style={styles.inputContainer}>
-                <Text style={[styles.inputLabel, { color: colors.text }]}>
-                  Nombre completo * ({customerName.length}/50)
-                </Text>
-                <TextInput
-                  style={[styles.textInput, { borderColor: colors.border, color: colors.text }]}
-                  placeholder="Ingresa tu nombre"
-                  placeholderTextColor={colors.icon}
-                  value={customerName}
-                  onChangeText={handleNameChange}
-                  maxLength={50}
-                />
-              </View>
-
-              <View style={styles.inputContainer}>
-                <Text style={[styles.inputLabel, { color: colors.text }]}>
-                  Teléfono * ({customerPhone.length}/10)
-                </Text>
-                <TextInput
-                  style={[styles.textInput, { borderColor: colors.border, color: colors.text }]}
-                  placeholder="Ingresa tu teléfono (10 dígitos)"
-                  placeholderTextColor={colors.icon}
-                  value={customerPhone}
-                  onChangeText={handlePhoneChange}
-                  keyboardType="numeric"
-                  maxLength={10}
-                />
+              {/* Información del usuario */}
+              <View style={[styles.summaryContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <Text style={[styles.summaryTitle, { color: colors.text }]}>Información del Cliente</Text>
+                <View style={styles.summaryRow}>
+                  <Text style={[styles.summaryLabel, { color: colors.icon }]}>Nombre:</Text>
+                  <Text style={[styles.summaryValue, { color: colors.text }]}>
+                    {user?.user_metadata?.full_name || user?.email || 'Usuario'}
+                  </Text>
+                </View>
+                <View style={styles.summaryRow}>
+                  <Text style={[styles.summaryLabel, { color: colors.icon }]}>Email:</Text>
+                  <Text style={[styles.summaryValue, { color: colors.text }]}>{user?.email}</Text>
+                </View>
               </View>
 
               <View style={styles.inputContainer}>
