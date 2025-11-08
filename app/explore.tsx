@@ -1,3 +1,4 @@
+import { useAuth } from '@/components/auth/AuthContext';
 import { BarberCard } from '@/components/barberia/BarberCard';
 import { CustomButton } from '@/components/barberia/CustomButton';
 import { ServiceCard } from '@/components/barberia/ServiceCard';
@@ -15,14 +16,13 @@ import { useAuth } from '@/components/auth/AuthContext';
 export default function BookAppointmentScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
+  const { user } = useAuth();
   
   const [step, setStep] = useState(1);
   const [selectedService, setSelectedService] = useState<any>(null);
   const [selectedBarber, setSelectedBarber] = useState<any>(null);
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [selectedTime, setSelectedTime] = useState<string>('');
-  const [customerName, setCustomerName] = useState<string>('');
-  const [customerPhone, setCustomerPhone] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
   const [occupiedTimes, setOccupiedTimes] = useState<string[]>([]);
 
@@ -123,20 +123,7 @@ export default function BookAppointmentScreen() {
 
   const dates = generateDates();
 
-  const handlePhoneChange = (text: string) => {
-    // Solo permitir números y limitar a 10 dígitos
-    const numericText = text.replace(/[^0-9]/g, '');
-    if (numericText.length <= 10) {
-      setCustomerPhone(numericText);
-    }
-  };
 
-  const handleNameChange = (text: string) => {
-    // Limitar a 50 caracteres para el nombre
-    if (text.length <= 50) {
-      setCustomerName(text);
-    }
-  };
 
   const handleNotesChange = (text: string) => {
     // Limitar a 200 caracteres para las notas
@@ -194,12 +181,88 @@ export default function BookAppointmentScreen() {
     return data?.map(appointment => appointment.time) || [];
   };
 
-  // Filtrar horarios disponibles
-  const availableTimeSlots = timeSlots.filter(time => !occupiedTimes.includes(time));
+  // Función para verificar si un horario está en el futuro
+  const isTimeInFuture = (timeString: string, dateString: string) => {
+    if (!dateString) {
+      return true;
+    }
+    
+    const now = new Date();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Resetear horas para comparación de fechas
+    
+    // Determinar qué día es
+    let selectedDate: Date;
+    let isToday = false;
+    
+    if (dateString.startsWith('Hoy,')) {
+      selectedDate = new Date(today);
+      isToday = true;
+    } else if (dateString.startsWith('Mañana,')) {
+      selectedDate = new Date(today);
+      selectedDate.setDate(today.getDate() + 1);
+    } else {
+      // Parsear formato normal
+      const dateParts = dateString.split(', ')[1]?.split(' ');
+      if (!dateParts || dateParts.length < 2) {
+        return true;
+      }
+      
+      const day = Number.parseInt(dateParts[0], 10);
+      const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 
+                          'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+      const monthIndex = monthNames.indexOf(dateParts[1]);
+      
+      if (monthIndex === -1) {
+        return true;
+      }
+      
+      selectedDate = new Date(today.getFullYear(), monthIndex, day);
+      isToday = selectedDate.toDateString() === new Date().toDateString();
+    }
+    
+    // Si NO es hoy, mostrar todos los horarios
+    if (!isToday) {
+      return true;
+    }
+    
+    // Si ES hoy, verificar la hora
+    const [time, period] = timeString.split(' ');
+    if (!time || !period) {
+      return true;
+    }
+    
+    const [hoursStr, minutesStr] = time.split(':');
+    const hours = Number.parseInt(hoursStr, 10);
+    const minutes = Number.parseInt(minutesStr, 10);
+    
+    let hour24 = hours;
+    if (period === 'PM' && hours !== 12) hour24 += 12;
+    if (period === 'AM' && hours === 12) hour24 = 0;
+    
+    // Crear fecha de la cita
+    const appointmentDateTime = new Date();
+    appointmentDateTime.setHours(hour24, minutes, 0, 0);
+    
+    // Tiempo con buffer de 30 minutos
+    const timeWithBuffer = new Date(now.getTime() + 30 * 60 * 1000);
+    
+    return appointmentDateTime > timeWithBuffer;
+  };
+
+  // Filtrar horarios disponibles (no ocupados y en el futuro)
+  const availableTimeSlots = selectedDate 
+    ? timeSlots.filter(time => 
+        !occupiedTimes.includes(time) && 
+        isTimeInFuture(time, selectedDate)
+      )
+    : []; // Si no hay fecha seleccionada, no mostrar horarios
   
-  console.log('🕐 Horarios totales:', timeSlots);
-  console.log('🚫 Horarios ocupados:', occupiedTimes);
-  console.log('✅ Horarios disponibles:', availableTimeSlots);
+  // Debug logs (solo cuando hay fecha seleccionada)
+  if (selectedDate && __DEV__) {
+    console.log('📅 Fecha seleccionada:', selectedDate);
+    console.log('✅ Horarios disponibles:', availableTimeSlots.length);
+  }
 
   const handleNext = () => {
     if (step < 4) {
@@ -213,9 +276,7 @@ export default function BookAppointmentScreen() {
     }
   };
 
-  const { user } = useAuth();
-
-  const handleBookAppointment = async () => {
+  const handleBookAppointment = () => {
     if (!customerName.trim() || !customerPhone.trim()) {
       Alert.alert('Error', 'Por favor completa todos los campos obligatorios');
       return;
@@ -247,11 +308,10 @@ export default function BookAppointmentScreen() {
         date: appointmentDate,
         time: selectedTime,
         price: selectedService?.price,
-        customer_name: customerName.trim(),
-        customer_phone: customerPhone,
-        notes: notes.trim(),
+        customer_name: user.user_metadata?.full_name || user.email || 'Usuario',
+        customer_phone: user.user_metadata?.phone || user.phone || '',
+        notes: notes,
         status: 'confirmed',
-        user_id: user?.id,
       };
 
       const { error } = await supabase
@@ -287,8 +347,6 @@ export default function BookAppointmentScreen() {
     setSelectedBarber(null);
     setSelectedDate('');
     setSelectedTime('');
-    setCustomerName('');
-    setCustomerPhone('');
     setNotes('');
   };
 
@@ -301,7 +359,7 @@ export default function BookAppointmentScreen() {
       case 3:
         return selectedDate !== '' && selectedTime !== '';
       case 4:
-        return customerName.trim() !== '' && customerPhone.trim() !== '' && customerPhone.length === 10;
+        return true; // Ya no necesitamos validar datos del usuario
       default:
         return false;
     }
@@ -434,33 +492,49 @@ export default function BookAppointmentScreen() {
 
               <Text style={[styles.sectionLabel, { color: colors.text }]}>Hora disponible</Text>
               <View style={styles.timeGrid}>
-                {availableTimeSlots.map((time) => (
-                  <TouchableOpacity
-                    key={time}
-                    style={[
-                      styles.timeButton,
-                      { 
-                        backgroundColor: selectedTime === time ? colors.primary : colors.card,
-                        borderColor: selectedTime === time ? colors.primary : colors.border
-                      }
-                    ]}
-                    onPress={() => setSelectedTime(time)}
-                  >
-                    <Text style={[
-                      styles.timeText,
-                      { color: selectedTime === time ? '#FFF' : colors.text }
-                    ]}>
-                      {time}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-                {availableTimeSlots.length === 0 && selectedDate && selectedBarber && (
-                  <View style={styles.noTimesContainer}>
-                    <Text style={[styles.noTimesText, { color: colors.icon }]}>
-                      No hay horarios disponibles para esta fecha y barbero.
-                    </Text>
-                  </View>
-                )}
+                {(() => {
+                  if (!selectedDate) {
+                    return (
+                      <View style={styles.selectDateContainer}>
+                        <IconSymbol name="calendar" size={48} color={colors.icon} />
+                        <Text style={[styles.selectDateText, { color: colors.icon }]}>
+                          Por favor selecciona una fecha para ver los horarios disponibles
+                        </Text>
+                      </View>
+                    );
+                  }
+                  
+                  if (availableTimeSlots.length > 0) {
+                    return availableTimeSlots.map((time) => (
+                      <TouchableOpacity
+                        key={time}
+                        style={[
+                          styles.timeButton,
+                          { 
+                            backgroundColor: selectedTime === time ? colors.primary : colors.card,
+                            borderColor: selectedTime === time ? colors.primary : colors.border
+                          }
+                        ]}
+                        onPress={() => setSelectedTime(time)}
+                      >
+                        <Text style={[
+                          styles.timeText,
+                          { color: selectedTime === time ? '#FFF' : colors.text }
+                        ]}>
+                          {time}
+                        </Text>
+                      </TouchableOpacity>
+                    ));
+                  }
+                  
+                  return (
+                    <View style={styles.noTimesContainer}>
+                      <Text style={[styles.noTimesText, { color: colors.icon }]}>
+                        No hay horarios disponibles para esta fecha y barbero.
+                      </Text>
+                    </View>
+                  );
+                })()}
               </View>
             </ScrollView>
           </ThemedView>
@@ -470,7 +544,7 @@ export default function BookAppointmentScreen() {
         return (
           <ThemedView style={styles.stepContent}>
             <ThemedText type="subtitle" style={styles.stepTitle}>
-              Información del Cliente
+              Confirmar Cita
             </ThemedText>
             
             <ScrollView 
@@ -478,33 +552,19 @@ export default function BookAppointmentScreen() {
               showsVerticalScrollIndicator={false}
               contentContainerStyle={styles.scrollContent}
             >
-              <View style={styles.inputContainer}>
-                <Text style={[styles.inputLabel, { color: colors.text }]}>
-                  Nombre completo * ({customerName.length}/50)
-                </Text>
-                <TextInput
-                  style={[styles.textInput, { borderColor: colors.border, color: colors.text }]}
-                  placeholder="Ingresa tu nombre"
-                  placeholderTextColor={colors.icon}
-                  value={customerName}
-                  onChangeText={handleNameChange}
-                  maxLength={50}
-                />
-              </View>
-
-              <View style={styles.inputContainer}>
-                <Text style={[styles.inputLabel, { color: colors.text }]}>
-                  Teléfono * ({customerPhone.length}/10)
-                </Text>
-                <TextInput
-                  style={[styles.textInput, { borderColor: colors.border, color: colors.text }]}
-                  placeholder="Ingresa tu teléfono (10 dígitos)"
-                  placeholderTextColor={colors.icon}
-                  value={customerPhone}
-                  onChangeText={handlePhoneChange}
-                  keyboardType="numeric"
-                  maxLength={10}
-                />
+              {/* Información del usuario */}
+              <View style={[styles.summaryContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <Text style={[styles.summaryTitle, { color: colors.text }]}>Información del Cliente</Text>
+                <View style={styles.summaryRow}>
+                  <Text style={[styles.summaryLabel, { color: colors.icon }]}>Nombre:</Text>
+                  <Text style={[styles.summaryValue, { color: colors.text }]}>
+                    {user?.user_metadata?.full_name || user?.email || 'Usuario'}
+                  </Text>
+                </View>
+                <View style={styles.summaryRow}>
+                  <Text style={[styles.summaryLabel, { color: colors.icon }]}>Email:</Text>
+                  <Text style={[styles.summaryValue, { color: colors.text }]}>{user?.email}</Text>
+                </View>
               </View>
 
               <View style={styles.inputContainer}>
@@ -815,6 +875,22 @@ const styles = StyleSheet.create({
   noTimesText: {
     fontSize: 16,
     textAlign: 'center',
+    fontStyle: 'italic',
+  },
+  selectDateContainer: {
+    width: '100%',
+    padding: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.02)',
+    borderRadius: 12,
+    marginVertical: 20,
+  },
+  selectDateText: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginTop: 12,
+    lineHeight: 22,
     fontStyle: 'italic',
   },
 });
