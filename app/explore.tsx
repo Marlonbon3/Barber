@@ -9,6 +9,8 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { router, Stack } from 'expo-router';
 import { useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { supabase } from '@/utils/database';
+import { useAuth } from '@/components/auth/AuthContext';
 
 export default function BookAppointmentScreen() {
   const colorScheme = useColorScheme();
@@ -154,7 +156,9 @@ export default function BookAppointmentScreen() {
     }
   };
 
-  const handleBookAppointment = () => {
+  const { user } = useAuth();
+
+  const handleBookAppointment = async () => {
     if (!customerName.trim() || !customerPhone.trim()) {
       Alert.alert('Error', 'Por favor completa todos los campos obligatorios');
       return;
@@ -165,17 +169,44 @@ export default function BookAppointmentScreen() {
       return;
     }
 
-    Alert.alert(
-      'Cita Agendada',
-      `Tu cita ha sido agendada exitosamente!\n\nServicio: ${selectedService?.name}\nBarbero: ${selectedBarber?.name}\nFecha: ${selectedDate}\nHora: ${selectedTime}\nPrecio: $${selectedService?.price}`,
-      [{ 
-        text: 'OK', 
-        onPress: () => {
-          resetForm();
-          router.push('/(tabs)/appointments');
-        }
-      }]
-    );
+    // Intentar insertar la cita en la base de datos (Supabase)
+    try {
+      const scheduledAt = new Date();
+      // Nota: No convertimos selectedDate text a timestamp exacto aquí; guardamos scheduled_at como now()
+      const { error } = await supabase.from('appointments').insert([{
+        user_id: user?.id ?? null,
+        client: customerName,
+        service: selectedService?.name ?? null,
+        barber: selectedBarber?.name ?? null,
+        scheduled_at: scheduledAt.toISOString(),
+        time: selectedTime,
+        date: selectedDate,
+        status: 'pending',
+        price: String(selectedService?.price ?? ''),
+        notes: notes,
+      }]).select();
+
+      if (error) {
+        console.error('Error creating appointment', error);
+        Alert.alert('Error', 'No se pudo crear la cita: ' + (error.message ?? JSON.stringify(error)));
+        return;
+      }
+
+      Alert.alert(
+        'Cita Agendada',
+        `Tu cita ha sido agendada exitosamente!\n\nServicio: ${selectedService?.name}\nBarbero: ${selectedBarber?.name}\nFecha: ${selectedDate}\nHora: ${selectedTime}\nPrecio: $${selectedService?.price}`,
+        [{ 
+          text: 'OK', 
+          onPress: () => {
+            resetForm();
+            router.push('/(tabs)/appointments');
+          }
+        }]
+      );
+    } catch (err: any) {
+      console.error('Unexpected error creating appointment', err);
+      Alert.alert('Error', err?.message ?? JSON.stringify(err));
+    }
   };
 
   const resetForm = () => {

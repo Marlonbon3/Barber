@@ -6,43 +6,63 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { router } from 'expo-router';
-import { useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { ScrollView, StyleSheet, Text, View, Alert } from 'react-native';
+import { supabase } from '@/utils/database';
+import { useAuth } from '@/components/auth/AuthContext';
 
 export default function AppointmentsScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
-  
-  // Estado simulado de citas
-  const [appointments] = useState([
-    {
-      id: '1',
-      service: 'Corte Moderno',
-      barber: 'Carlos Mendez',
-      date: 'Viernes, 15 Nov',
-      time: '2:30 PM',
-      price: 35,
-      status: 'confirmed' as const,
-    },
-    {
-      id: '2',
-      service: 'Corte + Barba',
-      barber: 'Miguel Torres',
-      date: 'Lunes, 18 Nov',
-      time: '11:00 AM',
-      price: 40,
-      status: 'confirmed' as const,
-    },
-    {
-      id: '3',
-      service: 'Afeitado Clásico',
-      barber: 'Roberto Silva',
-      date: 'Miércoles, 13 Nov',
-      time: '4:00 PM',
-      price: 30,
-      status: 'completed' as const,
-    },
-  ]);
+  const { user } = useAuth();
+  const [appointments, setAppointments] = useState<any[]>([]);
+
+  useEffect(() => {
+    let channel: any = null;
+    const fetch = async () => {
+      let query = supabase.from('appointments').select('*').order('id', { ascending: false });
+      if (user?.id) query = query.eq('user_id', user.id as string);
+      const { data, error } = await (query as any);
+      if (error) return console.error(error);
+      setAppointments(data ?? []);
+    };
+
+    fetch();
+
+    try {
+      channel = supabase
+        .channel('public:appointments')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'appointments' }, (payload: any) => {
+          const record = payload.new ?? payload.old;
+          if (!record) return;
+          // If user is present, ignore records for other users
+          if (user?.id && record.user_id !== user.id) return;
+          setAppointments(prev => {
+            switch (payload.eventType) {
+              case 'INSERT':
+                return [record, ...prev.filter(a => a.id !== record.id)];
+              case 'UPDATE':
+                return prev.map(a => (a.id === record.id ? record : a));
+              case 'DELETE':
+                return prev.filter(a => a.id !== record.id);
+              default:
+                return prev;
+            }
+          });
+        })
+        .subscribe();
+    } catch (e) {
+      console.warn('Realtime appointments (tabs) subscription failed', e);
+    }
+
+    return () => {
+      try {
+        if (channel) supabase.removeChannel(channel);
+      } catch {
+        channel?.unsubscribe?.();
+      }
+    };
+  }, [user?.id]);
 
   const upcomingAppointments = appointments.filter(apt => apt.status === 'confirmed');
   const pastAppointments = appointments.filter(apt => apt.status === 'completed');
@@ -54,7 +74,15 @@ export default function AppointmentsScreen() {
 
   const handleCancelAppointment = (appointmentId: string) => {
     console.log('Cancelar cita:', appointmentId);
-    // Aquí iría la lógica para cancelar la cita
+    // Se actualiza status a 'cancelled' en la base de datos
+    (async () => {
+      try {
+        const { error } = await supabase.from('appointments').update({ status: 'cancelled' }).eq('id', appointmentId);
+        if (error) throw error;
+      } catch (err: any) {
+        Alert.alert('Error', err.message || 'No se pudo cancelar');
+      }
+    })();
   };
 
   const handleScheduleNew = () => {

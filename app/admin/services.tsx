@@ -1,42 +1,39 @@
 import { router } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-    Alert,
-    Modal,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { IconSymbol } from '../../components/ui/icon-symbol';
 import { Colors } from '../../constants/theme';
 import { useColorScheme } from '../../hooks/use-color-scheme';
+import { supabase } from '../../utils/database';
 
 type Service = {
-  id: number;
+  id: number;  // PostgreSQL uses int8 for the service id
   name: string;
   price: string;
   duration: string;
+  owner_id?: string | null;  // UUID from auth.users.id
 };
 
 export default function ServicesManagement() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
 
-  const initialServices: Service[] = [
-    { id: 1, name: 'Corte Clásico', price: '$15.000', duration: '30 min' },
-    { id: 2, name: 'Barba Completa', price: '$12.000', duration: '25 min' },
-    { id: 3, name: 'Corte + Barba', price: '$25.000', duration: '45 min' },
-  ];
-
-  const [services, setServices] = useState<Service[]>(initialServices);
+  const [services, setServices] = useState<Service[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [editing, setEditing] = useState<Service | null>(null);
   const [name, setName] = useState('');
   const [price, setPrice] = useState('');
   const [duration, setDuration] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
   const openAdd = () => {
     setEditing(null);
@@ -46,11 +43,84 @@ export default function ServicesManagement() {
     setModalVisible(true);
   };
 
+  // Fetch services from Supabase and subscribe realtime changes
+  useEffect(() => {
+    let channel: any = null;
+
+    const fetchServices = async () => {
+      const { data, error } = await supabase
+        .from('services')
+        .select('*')
+        .order('id', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching services', error);
+        return;
+      }
+      // normalize price/duration for display and keep id as number
+      const normalized = (data ?? []).map((d: any) => ({
+        ...d,
+        id: Number(d.id),
+        price: d?.price != null ? String(d.price) : '$0',
+        duration: d?.duration != null ? String(d.duration) : '30 min',
+      }));
+      setServices(normalized);
+    };
+
+    fetchServices();
+
+    try {
+      channel = supabase
+        .channel('public:services')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'services' }, (payload: any) => {
+          const raw = payload.new ?? payload.old;
+          if (!raw) return;
+          const record = {
+            ...raw,
+            id: Number(raw.id),
+            price: raw?.price != null ? String(raw.price) : '$0',
+            duration: raw?.duration != null ? String(raw.duration) : '30 min',
+          };
+
+          switch (payload.eventType) {
+            case 'INSERT':
+              setServices(prev => [record, ...prev.filter(s => s.id !== record.id)]);
+              break;
+            case 'UPDATE':
+              setServices(prev => prev.map(s => (s.id === record.id ? record : s)));
+              break;
+            case 'DELETE':
+              setServices(prev => prev.filter(s => s.id !== record.id));
+              break;
+            default:
+              break;
+          }
+        })
+        .subscribe();
+    } catch (e) {
+      console.warn('Realtime subscription failed', e);
+    }
+
+    return () => {
+      try {
+        if (channel) supabase.removeChannel(channel);
+      } catch {
+        try {
+          channel?.unsubscribe?.();
+        } catch {}
+      }
+    };
+  }, []);
+
   const openEdit = (s: Service) => {
     setEditing(s);
     setName(s.name);
-    setPrice(s.price);
-    setDuration(s.duration);
+    // strip any leading $ when showing in input
+    setPrice(String(s.price ?? '').replace(/^\$/,''));
+    // if duration starts with a number, show only numeric portion for easier editing
+    const dur = String(s.duration ?? '');
+    const durNum = dur.match(/^(\d+)/);
+    setDuration(durNum ? durNum[1] : dur);
     setModalVisible(true);
   };
 
@@ -60,25 +130,176 @@ export default function ServicesManagement() {
       return;
     }
 
-    if (editing) {
-      setServices((prev) => prev.map((p) => (p.id === editing.id ? { ...p, name, price, duration } : p)));
-    } else {
-      const newService: Service = {
-        id: Date.now(),
-        name,
-        price: price || '$0',
-        duration: duration || '30 min',
-      };
-      setServices((prev) => [newService, ...prev]);
+    if (!price || isNaN(Number(price))) {
+      Alert.alert('Precio inválido', 'Por favor ingresa un precio válido.');
+      return;
     }
 
-    setModalVisible(false);
+    if (!duration || isNaN(Number(duration))) {
+      Alert.alert('Duración inválida', 'Por favor ingresa una duración válida en minutos.');
+      return;
+    }
+
+    setIsSaving(true);
+
+    (async () => {
+      try {
+        if (editing) {
+          // Obtener el usuario actual para verificar permisos
+          const { data: { user }, error: userError } = await supabase.auth.getUser();
+          if (userError || !user) {
+            Alert.alert('Error', 'No se pudo verificar tu sesión. Por favor, inicia sesión nuevamente.');
+            return;
+          }
+
+          const res = await supabase
+            .from('services')
+            .update({ 
+              name, 
+              price: price || '$0', 
+              duration: duration ? (/\d+/.test(duration) ? `${duration} min` : duration) : '30 min'
+            })
+            .match({ 
+              id: editing.id,
+              owner_id: user.id // Asegurarnos que solo editamos si somos dueños
+            })
+            .select('*');
+
+          if (res.error) {
+            console.error('Supabase update error', res.error);
+            Alert.alert('Error al actualizar', JSON.stringify(res.error, null, 2));
+            return;
+          }
+          // optimistic update: update local list immediately so user sees changes
+          if (!res.error && res.data && res.data[0]) {
+            const updated = res.data[0];
+            setServices(prev => prev.map(s => (s.id === updated.id ? {
+              ...s,
+              ...updated,
+              price: updated.price != null ? String(updated.price) : '$0',
+              duration: updated.duration != null ? String(updated.duration) : '30 min',
+            } : s)));
+          }
+          setModalVisible(false);
+        } else {
+          // Obtener el usuario actual
+          const { data: { user }, error: userError } = await supabase.auth.getUser();
+          if (userError || !user) {
+            Alert.alert('Error', 'No se pudo verificar tu sesión. Por favor, inicia sesión nuevamente.');
+            return;
+          }
+
+          // Crear el servicio con el owner_id del usuario actual
+          const payload = {
+            name,
+            price: price || '$0',
+            duration: duration ? (/(\d+)/.test(duration) ? `${duration} min` : duration) : '30 min',
+            owner_id: user.id
+          };
+
+          console.log('Creando servicio con:', payload); // Para debug
+
+          const res = await supabase
+            .from('services')
+            .insert([payload])
+            .select('*');
+
+          if (res.error) {
+            console.error('Supabase insert error', res.error);
+            Alert.alert('Error al crear', JSON.stringify(res.error, null, 2));
+            return;
+          }
+
+          // éxito: update local list immediately using returned row (avoids having to navigate out)
+          if (!res.error && res.data && res.data[0]) {
+            const inserted = res.data[0];
+            const row = { ...inserted, price: inserted.price != null ? String(inserted.price) : '$0', duration: inserted.duration != null ? String(inserted.duration) : '30 min' };
+            setServices(prev => [row, ...prev.filter((s) => s.id !== row.id)]);
+          }
+          setModalVisible(false);
+        }
+      } catch (err: any) {
+        console.error('Unexpected error saving service', err);
+        Alert.alert('Error', err?.message || JSON.stringify(err));
+      } finally {
+        setIsSaving(false);
+      }
+    })();
   };
 
   const confirmDelete = (s: Service) => {
     Alert.alert('Eliminar servicio', `¿Eliminar ${s.name}?`, [
       { text: 'Cancelar', style: 'cancel' },
-      { text: 'Eliminar', style: 'destructive', onPress: () => setServices((prev) => prev.filter((p) => p.id !== s.id)) },
+      { text: 'Eliminar', style: 'destructive', onPress: async () => {
+            try {
+              // Primero verificar si hay citas asociadas
+              const { data: appointments, error: appointmentsError } = await supabase
+                .from('appointments')
+                .select('id')
+                .eq('service_id', s.id)
+                .limit(1);
+
+              if (appointmentsError) {
+                console.error('Error checking appointments:', appointmentsError);
+                Alert.alert('Error', 'No se pudo verificar si hay citas asociadas');
+                return;
+              }
+
+              if (appointments && appointments.length > 0) {
+                Alert.alert(
+                  'No se puede eliminar',
+                  'Este servicio tiene citas asociadas. Elimine primero las citas.'
+                );
+                return;
+              }
+
+              // Obtener el usuario actual para verificar permisos
+              const { data: { user }, error: userError } = await supabase.auth.getUser();
+              if (userError || !user) {
+                Alert.alert('Error', 'No se pudo verificar tu sesión. Por favor, inicia sesión nuevamente.');
+                return;
+              }
+
+              // Debug: mostrar información del servicio y usuario
+              console.log('Intentando eliminar servicio:', {
+                service_id: s.id,
+                service_owner: s.owner_id,
+                current_user: user.id
+              });
+
+              // Si no hay citas, procedemos a eliminar
+              const res = await supabase
+                .from('services')
+                .delete()
+                .match({ 
+                  id: s.id,
+                  owner_id: user.id // Asegurarnos que solo eliminamos si somos dueños
+                })
+                .select('*');
+
+              if (res.error) {
+                console.error('Error al eliminar:', res.error);
+                Alert.alert('Error al eliminar', 
+                  `No tienes permiso para eliminar este servicio.\nDueño: ${s.owner_id}\nUsuario actual: ${user.id}`
+                );
+                return;
+              }
+
+              if (!res.data || res.data.length === 0) {
+                Alert.alert('Error', 
+                  `No se pudo eliminar el servicio.\nDueño del servicio: ${s.owner_id}\nTu usuario: ${user.id}`
+                );
+                return;
+              }
+
+              // Eliminación exitosa
+              setServices(prev => prev.filter(item => item.id !== s.id));
+              Alert.alert('Éxito', 'Servicio eliminado correctamente');
+          } catch (err: any) {
+            Alert.alert('Error', err.message || 'No se pudo eliminar');
+          }
+        }
+      },
     ]);
   };
 
@@ -124,7 +345,7 @@ export default function ServicesManagement() {
             <View style={styles.serviceDetails}>
               <View style={styles.serviceInfo}>
                 <View style={styles.priceContainer}>
-                  <Text style={[styles.servicePrice, { color: '#4CAF50' }]}>{service.price}</Text>
+                  <Text style={[styles.servicePrice, { color: '#4CAF50' }]}>{String(service.price).startsWith('$') ? service.price : `$${service.price}`}</Text>
                 </View>
                 <View style={styles.durationContainer}>
                   <IconSymbol name="clock" size={16} color={colors.icon} />
@@ -169,14 +390,16 @@ export default function ServicesManagement() {
               placeholder="Precio"
               placeholderTextColor={colors.icon}
               value={price}
-              onChangeText={setPrice}
+              onChangeText={(t) => setPrice(t.replace(/[^0-9.]/g, ''))}
+              keyboardType="numeric"
               style={[styles.input, { color: colors.text, borderColor: colors.border }]}
             />
             <TextInput
-              placeholder="Duración"
+              placeholder="Duración (minutos)"
               placeholderTextColor={colors.icon}
               value={duration}
-              onChangeText={setDuration}
+              onChangeText={(t) => setDuration(t.replace(/[^0-9]/g, ''))}
+              keyboardType="numeric"
               style={[styles.input, { color: colors.text, borderColor: colors.border }]}
             />
 
@@ -184,8 +407,8 @@ export default function ServicesManagement() {
               <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.modalBtnSecondary}>
                 <Text style={styles.modalBtnText}>Cancelar</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={saveService} style={styles.modalBtnPrimary}>
-                <Text style={[styles.modalBtnText, { color: '#fff' }]}>{editing ? 'Guardar' : 'Agregar'}</Text>
+              <TouchableOpacity onPress={saveService} style={[styles.modalBtnPrimary, isSaving && { opacity: 0.6 }]} disabled={isSaving}>
+                <Text style={[styles.modalBtnText, { color: '#fff' }]}>{isSaving ? 'Guardando...' : (editing ? 'Guardar' : 'Agregar')}</Text>
               </TouchableOpacity>
             </View>
           </View>
