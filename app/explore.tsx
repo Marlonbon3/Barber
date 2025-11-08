@@ -1,3 +1,4 @@
+import { useAuth } from '@/components/auth/AuthContext';
 import { BarberCard } from '@/components/barberia/BarberCard';
 import { CustomButton } from '@/components/barberia/CustomButton';
 import { ServiceCard } from '@/components/barberia/ServiceCard';
@@ -10,7 +11,6 @@ import { supabase } from '@/utils/database';
 import { router, Stack } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { useAuth } from '@/components/auth/AuthContext';
 
 export default function BookAppointmentScreen() {
   const colorScheme = useColorScheme();
