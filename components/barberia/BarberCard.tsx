@@ -7,10 +7,12 @@ import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 interface Barber {
   id: string;
   name: string;
-  specialties: string[];
-  rating: number;
-  experience: string;
-  photo?: string;
+  specialties?: string[];
+  rating?: number;
+  experience?: string;
+  phone?: string;
+  email?: string;
+  avatar_url?: string;
 }
 
 interface BarberCardProps {
@@ -28,8 +30,8 @@ export function BarberCard({ barber, onPress }: BarberCardProps) {
       onPress={onPress}
     >
       <View style={styles.photoContainer}>
-        {barber.photo ? (
-          <Image source={{ uri: barber.photo }} style={styles.photo} />
+        {barber.avatar_url ? (
+          <Image source={{ uri: barber.avatar_url }} style={styles.photo} />
         ) : (
           <View style={[styles.photoPlaceholder, { backgroundColor: colors.accent }]}>
             <IconSymbol name="person.circle" size={40} color={colors.icon} />
@@ -45,29 +47,39 @@ export function BarberCard({ barber, onPress }: BarberCardProps) {
         <View style={styles.ratingContainer}>
           <IconSymbol name="star.fill" size={16} color="#FFD700" />
           <Text style={[styles.rating, { color: colors.text }]}>
-            {barber.rating}
+            {barber.rating || 4.5}
           </Text>
         </View>
         
         <Text style={[styles.experience, { color: colors.icon }]}>
-          {barber.experience}
+          {barber.experience || 'Experiencia profesional'}
         </Text>
         
         <View style={styles.specialtiesContainer}>
-          {barber.specialties.slice(0, 2).map((specialty, index) => (
-            <View 
-              key={index}
-              style={[styles.specialtyTag, { backgroundColor: colors.primary + '20' }]}
-            >
+          {barber.specialties && Array.isArray(barber.specialties) && barber.specialties.length > 0 ? (
+            <>
+              {barber.specialties.slice(0, 2).map((specialty, index) => (
+                <View 
+                  key={index}
+                  style={[styles.specialtyTag, { backgroundColor: colors.primary + '20' }]}
+                >
+                  <Text style={[styles.specialtyText, { color: colors.primary }]}>
+                    {specialty}
+                  </Text>
+                </View>
+              ))}
+              {barber.specialties.length > 2 && (
+                <Text style={[styles.moreSpecialties, { color: colors.icon }]}>
+                  +{barber.specialties.length - 2} más
+                </Text>
+              )}
+            </>
+          ) : (
+            <View style={[styles.specialtyTag, { backgroundColor: colors.primary + '20' }]}>
               <Text style={[styles.specialtyText, { color: colors.primary }]}>
-                {specialty}
+                Cortes generales
               </Text>
             </View>
-          ))}
-          {barber.specialties.length > 2 && (
-            <Text style={[styles.moreSpecialties, { color: colors.icon }]}>
-              +{barber.specialties.length - 2} más
-            </Text>
           )}
         </View>
       </View>

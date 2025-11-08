@@ -24,65 +24,21 @@ export default function BookAppointmentScreen() {
   const [customerPhone, setCustomerPhone] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
   const [occupiedTimes, setOccupiedTimes] = useState<string[]>([]);
+  const [barbers, setBarbers] = useState<any[]>([]);
+  const [loadingBarbers, setLoadingBarbers] = useState(true);
+  const [services, setServices] = useState<any[]>([]);
+  const [loadingServices, setLoadingServices] = useState(true);
+  const [customerid, setCustomerid] = useState<string | null>(null);
 
-  const services = [
-    {
-      id: '1',
-      name: 'Corte Clásico',
-      description: 'Corte tradicional con tijera y máquina',
-      price: 25,
-      duration: 45,
-      icon: 'scissors',
-    },
-    {
-      id: '2',
-      name: 'Corte Moderno',
-      description: 'Cortes modernos y actuales',
-      price: 35,
-      duration: 60,
-      icon: 'star.fill',
-    },
-    {
-      id: '3',
-      name: 'Arreglo de Barba',
-      description: 'Recorte y perfilado de barba',
-      price: 20,
-      duration: 30,
-      icon: 'face.smiling',
-    },
-    {
-      id: '4',
-      name: 'Corte + Barba',
-      description: 'Paquete completo',
-      price: 40,
-      duration: 75,
-      icon: 'crown.fill',
-    },
-  ];
-
-  const barbers = [
-    {
-      id: '1',
-      name: 'Carlos Mendez',
-      specialties: ['Cortes clásicos', 'Barbas'],
-      rating: 4.8,
-      experience: '15 años de experiencia',
-    },
-    {
-      id: '2',
-      name: 'Miguel Torres',
-      specialties: ['Cortes modernos', 'Afeitado'],
-      rating: 4.9,
-      experience: '12 años de experiencia',
-    },
-    {
-      id: '3',
-      name: 'Roberto Silva',
-      specialties: ['Todas las técnicas', 'Eventos'],
-      rating: 4.7,
-      experience: '20 años de experiencia',
-    },
-  ];
+  // useEffect para obtener el customerid del usuario autenticado
+  useEffect(() => {
+    const getCurrentUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setCustomerid(user?.id || null);
+    };
+    
+    getCurrentUser();
+  }, []);
 
   const timeSlots = [
     '9:00 AM', '9:30 AM', '10:00 AM', '10:30 AM', '11:00 AM', '11:30 AM',
@@ -144,13 +100,84 @@ export default function BookAppointmentScreen() {
     }
   };
 
+  // useEffect para cargar servicios al iniciar el componente
+  useEffect(() => {
+    const loadServices = async () => {
+      try {
+        setLoadingServices(true);
+        console.log('🔍 Cargando servicios desde la base de datos...');
+        
+        const { data, error } = await supabase
+          .from('services')
+          .select('id, name, price, duration, owner_id');
+        
+        if (error) {
+          console.error('❌ Error al cargar servicios:', error);
+          setServices([]);
+        } else {
+          console.log('✅ Servicios cargados:', data);
+          // Mapear los datos para que coincidan con la estructura esperada
+          const mappedServices = data?.map(service => ({
+            id: String(service.id),
+            name: service.name || 'Servicio',
+            price: service.price || 0,
+            duration: service.duration || 30,
+            owner_id: service.owner_id || null,
+          })) || [];
+          
+          setServices(mappedServices);
+        }
+      } catch (error) {
+        console.error('❌ Error inesperado al cargar servicios:', error);
+        setServices([]);
+      } finally {
+        setLoadingServices(false);
+      }
+    };
+
+    loadServices();
+  }, []);
+
+  // useEffect para cargar barberos al iniciar el componente
+  useEffect(() => {
+    const loadBarbers = async () => {
+      try {
+        setLoadingBarbers(true);
+        
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('id, first_name, last_name')
+          .eq('role', 'barber');
+        
+        if (error) {
+          // En caso de error, usar datos por defecto
+          setBarbers([]);
+        } else {
+          // Mapear los datos para que coincidan con la estructura esperada
+          const mappedBarbers = data?.map(barber => ({
+            id: String(barber.id),
+            name: `${barber.first_name || ''} ${barber.last_name || ''}`.trim() || 'Barbero',
+            
+          })) || [];
+          
+          setBarbers(mappedBarbers);
+        }
+      } catch (error) {
+        console.error('❌ Error inesperado al cargar barberos:', error);
+        setBarbers([]);
+      } finally {
+        setLoadingBarbers(false);
+      }
+    };
+
+    loadBarbers();
+  }, []);
+
   // useEffect para consultar horas ocupadas cuando cambien fecha o barbero
   useEffect(() => {
     const loadOccupiedTimes = async () => {
       if (selectedDate && selectedBarber) {
-        console.log('🔍 Consultando horas ocupadas para:', { selectedDate, barberId: selectedBarber.id });
-        const occupied = await fetchOccupiedTimes(selectedDate, selectedBarber.id);
-        console.log('⏰ Horas ocupadas encontradas:', occupied);
+        const occupied = await fetchOccupiedTimes(selectedDate, String(selectedBarber.id));
         setOccupiedTimes(occupied);
       } else {
         setOccupiedTimes([]);
@@ -174,8 +201,6 @@ export default function BookAppointmentScreen() {
 
     const formattedDate = formatDateForDB(date);
     
-    console.log('📅 Fecha formateada para consulta:', formattedDate);
-    console.log('👨‍💼 ID del barbero:', barberId);
     
     const { data, error } = await supabase
       .from('appointments')
@@ -185,20 +210,15 @@ export default function BookAppointmentScreen() {
       .neq('status', 'cancelled'); // Excluir citas canceladas
     
     if (error) {
-      console.error('❌ Error al consultar horas ocupadas:', error);
       return [];
     }
     
-    console.log('📊 Datos de la consulta:', data);
     return data?.map(appointment => appointment.time) || [];
   };
 
   // Filtrar horarios disponibles
   const availableTimeSlots = timeSlots.filter(time => !occupiedTimes.includes(time));
   
-  console.log('🕐 Horarios totales:', timeSlots);
-  console.log('🚫 Horarios ocupados:', occupiedTimes);
-  console.log('✅ Horarios disponibles:', availableTimeSlots);
 
   const handleNext = () => {
     if (step < 4) {
@@ -239,8 +259,8 @@ export default function BookAppointmentScreen() {
     const saveAppointment = async () => {
 
       const appointmentData = {
-        service_id: selectedService.id,
-        barber_id: selectedBarber.id,
+        service_id: String(selectedService.id),
+        barber_id: String(selectedBarber.id),
         date: appointmentDate,
         time: selectedTime,
         price: selectedService?.price,
@@ -248,6 +268,7 @@ export default function BookAppointmentScreen() {
         customer_phone: customerPhone,
         notes: notes,
         status: 'confirmed',
+        user_id: customerid || null,
       };
 
       const { error } = await supabase
@@ -336,24 +357,40 @@ export default function BookAppointmentScreen() {
             <ThemedText type="subtitle" style={styles.stepTitle}>
               Selecciona un Servicio
             </ThemedText>
-            <ScrollView showsVerticalScrollIndicator={false}>
-              {services.map((service) => (
-                <TouchableOpacity
-                  key={service.id}
-                  onPress={() => setSelectedService(service)}
-                >
-                  <View style={[
-                    styles.selectionBorder,
-                    selectedService?.id === service.id && { borderColor: colors.primary, borderWidth: 2 }
-                  ]}>
-                    <ServiceCard
-                      service={service}
-                      onPress={() => setSelectedService(service)}
-                    />
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
+            
+            {loadingServices ? (
+              <View style={styles.loadingContainer}>
+                <ThemedText style={[styles.loadingText, { color: colors.icon }]}>
+                  Cargando servicios disponibles...
+                </ThemedText>
+              </View>
+            ) : services.length === 0 ? (
+              <View style={styles.noDataContainer}>
+                <IconSymbol name="scissors" size={48} color={colors.icon} />
+                <ThemedText style={[styles.noDataText, { color: colors.icon }]}>
+                  No hay servicios disponibles en este momento
+                </ThemedText>
+              </View>
+            ) : (
+              <ScrollView showsVerticalScrollIndicator={false}>
+                {services.map((service) => (
+                  <TouchableOpacity
+                    key={service.id}
+                    onPress={() => setSelectedService(service)}
+                  >
+                    <View style={[
+                      styles.selectionBorder,
+                      selectedService?.id === service.id && { borderColor: colors.primary, borderWidth: 2 }
+                    ]}>
+                      <ServiceCard
+                        service={service}
+                        onPress={() => setSelectedService(service)}
+                      />
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            )}
           </ThemedView>
         );
 
@@ -363,24 +400,40 @@ export default function BookAppointmentScreen() {
             <ThemedText type="subtitle" style={styles.stepTitle}>
               Elige tu Barbero
             </ThemedText>
-            <ScrollView showsVerticalScrollIndicator={false}>
-              {barbers.map((barber) => (
-                <TouchableOpacity
-                  key={barber.id}
-                  onPress={() => setSelectedBarber(barber)}
-                >
-                  <View style={[
-                    styles.selectionBorder,
-                    selectedBarber?.id === barber.id && { borderColor: colors.primary, borderWidth: 2 }
-                  ]}>
-                    <BarberCard
-                      barber={barber}
-                      onPress={() => setSelectedBarber(barber)}
-                    />
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
+            
+            {loadingBarbers ? (
+              <View style={styles.loadingContainer}>
+                <ThemedText style={[styles.loadingText, { color: colors.icon }]}>
+                  Cargando barberos disponibles...
+                </ThemedText>
+              </View>
+            ) : barbers.length === 0 ? (
+              <View style={styles.noDataContainer}>
+                <IconSymbol name="person.slash" size={48} color={colors.icon} />
+                <ThemedText style={[styles.noDataText, { color: colors.icon }]}>
+                  No hay barberos disponibles en este momento
+                </ThemedText>
+              </View>
+            ) : (
+              <ScrollView showsVerticalScrollIndicator={false}>
+                {barbers.map((barber) => (
+                  <TouchableOpacity
+                    key={barber.id}
+                    onPress={() => setSelectedBarber(barber)}
+                  >
+                    <View style={[
+                      styles.selectionBorder,
+                      selectedBarber?.id === barber.id && { borderColor: colors.primary, borderWidth: 2 }
+                    ]}>
+                      <BarberCard
+                        barber={barber}
+                        onPress={() => setSelectedBarber(barber)}
+                      />
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            )}
           </ThemedView>
         );
 
@@ -811,5 +864,26 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlign: 'center',
     fontStyle: 'italic',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+  },
+  loadingText: {
+    fontSize: 16,
+    textAlign: 'center',
+  },
+  noDataContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+  },
+  noDataText: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginTop: 16,
   },
 });
