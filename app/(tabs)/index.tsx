@@ -122,11 +122,11 @@ export default function HomeScreen() {
               color: colorScheme === 'dark' ? colors.background : '#2C1810',
               fontSize: responsiveSize.heroTitleSize
             }]}>
-              BarberLine
+              BarberJaime653
             </Text>
             <View style={[styles.titleUnderline, { backgroundColor: colorScheme === 'dark' ? colors.background : '#2C1810' }]} />
             <Text style={[styles.heroSubtitle, { color: colorScheme === 'dark' ? colors.background : '#2C1810' }]}>
-              Estilo y tradición desde 1985
+              Estilo y tradición
             </Text>
           </View>
         </View>
@@ -156,7 +156,7 @@ export default function HomeScreen() {
             fontSize: isSmallDevice ? 14 : 16
           }]}>
             Descubre la experiencia única de nuestra barbería. Ofrecemos servicios de corte de cabello, 
-            arreglo de barba y cuidado personal con más de 35 años de experiencia.
+            arreglo de barba y cuidado personal con más de 6 años de experiencia.
           </ThemedText>
         </View>
       </ThemedView>
@@ -199,7 +199,7 @@ export default function HomeScreen() {
               numberOfLines={1}
               adjustsFontSizeToFit
             >
-              9:00 AM - 7:00 PM
+              10:00 AM - 11:00 PM
             </ThemedText>
           </View>
           <View style={[styles.hoursDivider, { backgroundColor: colors.border }]} />
@@ -214,7 +214,7 @@ export default function HomeScreen() {
               numberOfLines={1}
               adjustsFontSizeToFit
             >
-              Sábados
+              Sábados - Domingos
             </ThemedText>
             <ThemedText 
               style={[styles.timeText, { 
@@ -226,34 +226,7 @@ export default function HomeScreen() {
               numberOfLines={1}
               adjustsFontSizeToFit
             >
-              8:00 AM - 6:00 PM
-            </ThemedText>
-          </View>
-          <View style={[styles.hoursDivider, { backgroundColor: colors.border }]} />
-          <View style={[styles.hoursRow, {
-            paddingVertical: isSmallDevice ? 8 : 12
-          }]}>
-            <ThemedText 
-              style={[styles.dayText, {
-                fontSize: isSmallDevice ? 12 : isMediumDevice ? 14 : 16,
-                flex: 1
-              }]}
-              numberOfLines={1}
-              adjustsFontSizeToFit
-            >
-              Domingos
-            </ThemedText>
-            <ThemedText 
-              style={[styles.timeText, { 
-                color: colors.secondary,
-                fontSize: isSmallDevice ? 12 : isMediumDevice ? 14 : 16,
-                flex: 1,
-                textAlign: 'right'
-              }]}
-              numberOfLines={1}
-              adjustsFontSizeToFit
-            >
-              Cerrado
+              10:00 AM - 7:00 PM
             </ThemedText>
           </View>
         </View>
