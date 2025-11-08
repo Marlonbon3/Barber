@@ -10,7 +10,6 @@ import { supabase } from '@/utils/database';
 import { router, Stack } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { supabase } from '@/utils/database';
 import { useAuth } from '@/components/auth/AuthContext';
 
 export default function BookAppointmentScreen() {
@@ -226,6 +225,44 @@ export default function BookAppointmentScreen() {
       Alert.alert('Error', 'El teléfono debe tener exactamente 10 dígitos');
       return;
     }
+
+    try {
+      // Formatear fecha para la base de datos
+      const formatDateForDB = (date: string) => {
+        const parts = date.split(', ')[1].split(' ');
+        const day = parts[0];
+        const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 
+                           'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+        const monthIndex = monthNames.indexOf(parts[1]);
+        const year = new Date().getFullYear();
+        return `${year}-${(monthIndex + 1).toString().padStart(2, '0')}-${day.padStart(2, '0')}`;
+      };
+
+      const appointmentDate = formatDateForDB(selectedDate);
+
+      // Guardar cita en supabase
+      const appointmentData = {
+        service_id: selectedService.id,
+        barber_id: selectedBarber.id,
+        date: appointmentDate,
+        time: selectedTime,
+        price: selectedService?.price,
+        customer_name: customerName.trim(),
+        customer_phone: customerPhone,
+        notes: notes.trim(),
+        status: 'confirmed',
+        user_id: user?.id,
+      };
+
+      const { error } = await supabase
+        .from('appointments')
+        .insert([appointmentData]);
+      
+      if (error) {
+        console.error('Error al guardar la cita:', error);
+        Alert.alert('Error', 'No se pudo agendar la cita. Intenta nuevamente.');
+        return;
+      }
 
       Alert.alert(
         'Cita Agendada',
