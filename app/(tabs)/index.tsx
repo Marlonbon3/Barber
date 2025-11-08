@@ -1,4 +1,4 @@
-import { Alert, Dimensions, Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Dimensions, Image, Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { useAuth } from '@/components/auth/AuthContext';
 import { CustomButton } from '@/components/barberia/CustomButton';
@@ -103,10 +103,16 @@ export default function HomeScreen() {
           paddingHorizontal: responsiveSize.horizontalPadding
         }]}>
           <View style={styles.heroIconWrapper}>
-            <IconSymbol
-              size={responsiveSize.heroIconSize}
-              name="scissors"
-              color={colorScheme === 'dark' ? colors.background : '#2C1810'}
+            <Image
+              source={require('@/assets/images/jaime.jpg')}
+              style={[styles.heroImage, {
+                width: responsiveSize.heroIconSize,
+                height: responsiveSize.heroIconSize,
+                borderRadius: responsiveSize.heroIconSize / 2,
+                borderWidth: 3,
+                borderColor: colorScheme === 'dark' ? colors.background : '#2C1810',
+              }]}
+              resizeMode="cover"
             />
             <View style={[styles.decorativeCircle, { 
               borderColor: colorScheme === 'dark' ? colors.background : '#2C1810',
@@ -446,6 +452,9 @@ const styles = StyleSheet.create({
   heroIconWrapper: {
     position: 'relative',
     marginBottom: 20,
+  },
+  heroImage: {
+    // Estilos dinámicos aplicados inline
   },
   decorativeCircle: {
     position: 'absolute',
