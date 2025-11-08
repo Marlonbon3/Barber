@@ -12,11 +12,11 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
-import { supabase } from '../utils/database';
 import { useAuth } from '../components/auth/AuthContext';
 import { IconSymbol } from '../components/ui/icon-symbol';
 import { Colors } from '../constants/theme';
 import { useColorScheme } from '../hooks/use-color-scheme';
+import { supabase } from '../utils/database';
 
 export default function LoginScreen() {
   const { signIn, setRole } = useAuth();
