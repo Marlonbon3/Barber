@@ -180,12 +180,88 @@ export default function BookAppointmentScreen() {
     return data?.map(appointment => appointment.time) || [];
   };
 
-  // Filtrar horarios disponibles
-  const availableTimeSlots = timeSlots.filter(time => !occupiedTimes.includes(time));
+  // Función para verificar si un horario está en el futuro
+  const isTimeInFuture = (timeString: string, dateString: string) => {
+    if (!dateString) {
+      return true;
+    }
+    
+    const now = new Date();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Resetear horas para comparación de fechas
+    
+    // Determinar qué día es
+    let selectedDate: Date;
+    let isToday = false;
+    
+    if (dateString.startsWith('Hoy,')) {
+      selectedDate = new Date(today);
+      isToday = true;
+    } else if (dateString.startsWith('Mañana,')) {
+      selectedDate = new Date(today);
+      selectedDate.setDate(today.getDate() + 1);
+    } else {
+      // Parsear formato normal
+      const dateParts = dateString.split(', ')[1]?.split(' ');
+      if (!dateParts || dateParts.length < 2) {
+        return true;
+      }
+      
+      const day = Number.parseInt(dateParts[0], 10);
+      const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 
+                          'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+      const monthIndex = monthNames.indexOf(dateParts[1]);
+      
+      if (monthIndex === -1) {
+        return true;
+      }
+      
+      selectedDate = new Date(today.getFullYear(), monthIndex, day);
+      isToday = selectedDate.toDateString() === new Date().toDateString();
+    }
+    
+    // Si NO es hoy, mostrar todos los horarios
+    if (!isToday) {
+      return true;
+    }
+    
+    // Si ES hoy, verificar la hora
+    const [time, period] = timeString.split(' ');
+    if (!time || !period) {
+      return true;
+    }
+    
+    const [hoursStr, minutesStr] = time.split(':');
+    const hours = Number.parseInt(hoursStr, 10);
+    const minutes = Number.parseInt(minutesStr, 10);
+    
+    let hour24 = hours;
+    if (period === 'PM' && hours !== 12) hour24 += 12;
+    if (period === 'AM' && hours === 12) hour24 = 0;
+    
+    // Crear fecha de la cita
+    const appointmentDateTime = new Date();
+    appointmentDateTime.setHours(hour24, minutes, 0, 0);
+    
+    // Tiempo con buffer de 30 minutos
+    const timeWithBuffer = new Date(now.getTime() + 30 * 60 * 1000);
+    
+    return appointmentDateTime > timeWithBuffer;
+  };
+
+  // Filtrar horarios disponibles (no ocupados y en el futuro)
+  const availableTimeSlots = selectedDate 
+    ? timeSlots.filter(time => 
+        !occupiedTimes.includes(time) && 
+        isTimeInFuture(time, selectedDate)
+      )
+    : []; // Si no hay fecha seleccionada, no mostrar horarios
   
-  console.log('🕐 Horarios totales:', timeSlots);
-  console.log('🚫 Horarios ocupados:', occupiedTimes);
-  console.log('✅ Horarios disponibles:', availableTimeSlots);
+  // Debug logs (solo cuando hay fecha seleccionada)
+  if (selectedDate && __DEV__) {
+    console.log('📅 Fecha seleccionada:', selectedDate);
+    console.log('✅ Horarios disponibles:', availableTimeSlots.length);
+  }
 
   const handleNext = () => {
     if (step < 4) {
@@ -410,33 +486,49 @@ export default function BookAppointmentScreen() {
 
               <Text style={[styles.sectionLabel, { color: colors.text }]}>Hora disponible</Text>
               <View style={styles.timeGrid}>
-                {availableTimeSlots.map((time) => (
-                  <TouchableOpacity
-                    key={time}
-                    style={[
-                      styles.timeButton,
-                      { 
-                        backgroundColor: selectedTime === time ? colors.primary : colors.card,
-                        borderColor: selectedTime === time ? colors.primary : colors.border
-                      }
-                    ]}
-                    onPress={() => setSelectedTime(time)}
-                  >
-                    <Text style={[
-                      styles.timeText,
-                      { color: selectedTime === time ? '#FFF' : colors.text }
-                    ]}>
-                      {time}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-                {availableTimeSlots.length === 0 && selectedDate && selectedBarber && (
-                  <View style={styles.noTimesContainer}>
-                    <Text style={[styles.noTimesText, { color: colors.icon }]}>
-                      No hay horarios disponibles para esta fecha y barbero.
-                    </Text>
-                  </View>
-                )}
+                {(() => {
+                  if (!selectedDate) {
+                    return (
+                      <View style={styles.selectDateContainer}>
+                        <IconSymbol name="calendar" size={48} color={colors.icon} />
+                        <Text style={[styles.selectDateText, { color: colors.icon }]}>
+                          Por favor selecciona una fecha para ver los horarios disponibles
+                        </Text>
+                      </View>
+                    );
+                  }
+                  
+                  if (availableTimeSlots.length > 0) {
+                    return availableTimeSlots.map((time) => (
+                      <TouchableOpacity
+                        key={time}
+                        style={[
+                          styles.timeButton,
+                          { 
+                            backgroundColor: selectedTime === time ? colors.primary : colors.card,
+                            borderColor: selectedTime === time ? colors.primary : colors.border
+                          }
+                        ]}
+                        onPress={() => setSelectedTime(time)}
+                      >
+                        <Text style={[
+                          styles.timeText,
+                          { color: selectedTime === time ? '#FFF' : colors.text }
+                        ]}>
+                          {time}
+                        </Text>
+                      </TouchableOpacity>
+                    ));
+                  }
+                  
+                  return (
+                    <View style={styles.noTimesContainer}>
+                      <Text style={[styles.noTimesText, { color: colors.icon }]}>
+                        No hay horarios disponibles para esta fecha y barbero.
+                      </Text>
+                    </View>
+                  );
+                })()}
               </View>
             </ScrollView>
           </ThemedView>
@@ -777,6 +869,22 @@ const styles = StyleSheet.create({
   noTimesText: {
     fontSize: 16,
     textAlign: 'center',
+    fontStyle: 'italic',
+  },
+  selectDateContainer: {
+    width: '100%',
+    padding: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.02)',
+    borderRadius: 12,
+    marginVertical: 20,
+  },
+  selectDateText: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginTop: 12,
+    lineHeight: 22,
     fontStyle: 'italic',
   },
 });
