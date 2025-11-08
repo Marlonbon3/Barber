@@ -24,7 +24,7 @@ export default function ServicesScreen() {
         
         const { data, error } = await supabase
           .from('services')
-          .select('id, name, description, price, duration, icon');
+          .select('id, name, price, duration');
 
         if (error) {
           console.error('❌ Error al cargar servicios:', error);
@@ -35,10 +35,9 @@ export default function ServicesScreen() {
           const mappedServices = data?.map((service) => ({
             id: service.id,
             name: service.name || 'Servicio',
-            description: service.description || 'Descripción no disponible',
             price: service.price || 0,
             duration: service.duration || 30,
-            icon: service.icon || 'scissors',
+            icon: 'scissors'
           })) || [];
           
           setServices(mappedServices);

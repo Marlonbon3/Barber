@@ -253,6 +253,7 @@ export default function BookAppointmentScreen() {
         customer_phone: user.user_metadata?.phone || user.phone || '',
         notes: notes,
         status: 'confirmed',
+        user_id: customerid
       };
 
       const { error } = await supabase
@@ -848,5 +849,37 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlign: 'center',
     fontStyle: 'italic',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+  },
+  loadingText: {
+    fontSize: 16,
+    textAlign: 'center',
+  },
+  noDataContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+  },
+  noDataText: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginTop: 16,
+  },
+  selectDateContainer: {
+    width: '100%',
+    padding: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  selectDateText: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginTop: 12,
   },
 });
