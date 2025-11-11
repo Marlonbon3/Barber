@@ -108,8 +108,9 @@ export default function BookAppointmentScreen() {
           const mappedServices = data?.map(service => ({
             id: String(service.id),
             name: service.name || 'Servicio',
+            description: `Servicio profesional de ${service.duration || 30} minutos`,
             price: service.price || 0,
-            duration: service.duration || 30,
+            duration: `${service.duration || 30} min`,
             owner_id: service.owner_id || null,
             icon: 'scissors'
           })) || [];

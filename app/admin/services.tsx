@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
     Alert,
     Modal,
@@ -13,30 +13,64 @@ import {
 import { IconSymbol } from '../../components/ui/icon-symbol';
 import { Colors } from '../../constants/theme';
 import { useColorScheme } from '../../hooks/use-color-scheme';
+import { supabase } from '../../utils/database';
+import { useAuth } from '../../components/auth/AuthContext';
 
 type Service = {
-  id: number;
+  id: string;
   name: string;
-  price: string;
-  duration: string;
+  price: number;
+  duration: number;
+  owner_id: string;
 };
 
 export default function ServicesManagement() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
+  const { user } = useAuth();
 
-  const initialServices: Service[] = [
-    { id: 1, name: 'Corte Clásico', price: '$15.000', duration: '30 min' },
-    { id: 2, name: 'Barba Completa', price: '$12.000', duration: '25 min' },
-    { id: 3, name: 'Corte + Barba', price: '$25.000', duration: '45 min' },
-  ];
-
-  const [services, setServices] = useState<Service[]>(initialServices);
+  const [services, setServices] = useState<Service[]>([]);
+  const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
   const [editing, setEditing] = useState<Service | null>(null);
   const [name, setName] = useState('');
   const [price, setPrice] = useState('');
   const [duration, setDuration] = useState('');
+
+  useEffect(() => {
+    loadServices();
+  }, []);
+
+  const loadServices = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('services')
+        .select('*')
+        .order('name');
+
+      if (error) {
+        console.error('Error loading services:', error);
+        Alert.alert('Error', 'No se pudieron cargar los servicios');
+        return;
+      }
+
+      const mappedServices: Service[] = data?.map(service => ({
+        id: String(service.id),
+        name: service.name || '',
+        price: service.price || 0,
+        duration: service.duration || 30,
+        owner_id: service.owner_id || '',
+      })) || [];
+
+      setServices(mappedServices);
+    } catch (error) {
+      console.error('Error loading services:', error);
+      Alert.alert('Error', 'Error inesperado al cargar servicios');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const openAdd = () => {
     setEditing(null);
@@ -49,38 +83,126 @@ export default function ServicesManagement() {
   const openEdit = (s: Service) => {
     setEditing(s);
     setName(s.name);
-    setPrice(s.price);
-    setDuration(s.duration);
+    setPrice(String(s.price));
+    setDuration(String(s.duration));
     setModalVisible(true);
   };
 
-  const saveService = () => {
+  const saveService = async () => {
     if (!name.trim()) {
       Alert.alert('Nombre requerido', 'Por favor ingresa el nombre del servicio.');
       return;
     }
 
-    if (editing) {
-      setServices((prev) => prev.map((p) => (p.id === editing.id ? { ...p, name, price, duration } : p)));
-    } else {
-      const newService: Service = {
-        id: Date.now(),
-        name,
-        price: price || '$0',
-        duration: duration || '30 min',
-      };
-      setServices((prev) => [newService, ...prev]);
-    }
+    const priceNum = Number.parseFloat(price) || 0;
+    const durationNum = Number.parseInt(duration, 10) || 30;
 
-    setModalVisible(false);
+    try {
+      if (editing) {
+        // Actualizar servicio existente
+        const { error } = await supabase
+          .from('services')
+          .update({
+            name: name.trim(),
+            price: priceNum,
+            duration: durationNum,
+          })
+          .eq('id', editing.id);
+
+        if (error) {
+          console.error('Error updating service:', error);
+          Alert.alert('Error', 'No se pudo actualizar el servicio');
+          return;
+        }
+      } else {
+        // Crear nuevo servicio
+        const { error } = await supabase
+          .from('services')
+          .insert([{
+            name: name.trim(),
+            price: priceNum,
+            duration: durationNum,
+            owner_id: user?.id || null,
+          }]);
+
+        if (error) {
+          console.error('Error creating service:', error);
+          Alert.alert('Error', 'No se pudo crear el servicio');
+          return;
+        }
+      }
+
+      await loadServices();
+      setModalVisible(false);
+      Alert.alert('Éxito', editing ? 'Servicio actualizado correctamente' : 'Servicio creado correctamente');
+    } catch (error) {
+      console.error('Error saving service:', error);
+      Alert.alert('Error', 'Error inesperado al guardar el servicio');
+    }
   };
 
   const confirmDelete = (s: Service) => {
     Alert.alert('Eliminar servicio', `¿Eliminar ${s.name}?`, [
       { text: 'Cancelar', style: 'cancel' },
-      { text: 'Eliminar', style: 'destructive', onPress: () => setServices((prev) => prev.filter((p) => p.id !== s.id)) },
+      { 
+        text: 'Eliminar', 
+        style: 'destructive', 
+        onPress: () => {
+          deleteService(s.id).catch(console.error);
+        }
+      },
     ]);
   };
+
+  const deleteService = async (serviceId: string) => {
+    try {
+      const { error } = await supabase
+        .from('services')
+        .delete()
+        .eq('id', serviceId);
+
+      if (error) {
+        console.error('Error deleting service:', error);
+        Alert.alert('Error', 'No se pudo eliminar el servicio');
+        return;
+      }
+
+      await loadServices();
+      Alert.alert('Éxito', 'Servicio eliminado correctamente');
+    } catch (error) {
+      console.error('Error deleting service:', error);
+      Alert.alert('Error', 'Error inesperado al eliminar el servicio');
+    }
+  };
+
+  if (loading) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={styles.headerContainer}>
+          <TouchableOpacity
+            style={[styles.backButton, { backgroundColor: colors.card }]}
+            onPress={() => router.back()}
+          >
+            <IconSymbol name="arrow.left" size={20} color="#D4AF37" />
+            <Text style={[styles.backText, { color: colors.text }]}>Volver</Text>
+          </TouchableOpacity>
+          
+          <View style={styles.titleContainer}>
+            <Text style={styles.title}>Gestión de Servicios</Text>
+            <Text style={[styles.subtitle, { color: colors.icon }]}>
+              Administra los servicios de tu barbería
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.loadingContainer}>
+          <Text style={[styles.loadingText, { color: colors.icon }]}>
+            Cargando servicios...
+          </Text>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -111,46 +233,59 @@ export default function ServicesManagement() {
       </View>
 
       <ScrollView style={styles.servicesList}>
-        {services.map((service) => (
-          <View
-            key={service.id}
-            style={[styles.serviceCard, { backgroundColor: colors.card }]}
-          >
-            <View style={styles.serviceHeader}>
-              <IconSymbol name="scissors" size={20} color="#D4AF37" />
-              <Text style={[styles.serviceName, { color: colors.text }]}>{service.name}</Text>
-            </View>
-
-            <View style={styles.serviceDetails}>
-              <View style={styles.serviceInfo}>
-                <View style={styles.priceContainer}>
-                  <Text style={[styles.servicePrice, { color: '#4CAF50' }]}>{service.price}</Text>
-                </View>
-                <View style={styles.durationContainer}>
-                  <IconSymbol name="clock" size={16} color={colors.icon} />
-                  <Text style={[styles.serviceDuration, { color: colors.icon }]}>{service.duration}</Text>
-                </View>
-              </View>
-
-              <View style={styles.actionsRow}>
-                <TouchableOpacity 
-                  style={[styles.iconBtn, styles.editBtn]} 
-                  onPress={() => openEdit(service)}
-                  activeOpacity={0.7}
-                >
-                  <IconSymbol name="pencil" size={18} color="#D4AF37" />
-                </TouchableOpacity>
-                <TouchableOpacity 
-                  style={[styles.iconBtn, styles.deleteBtn]} 
-                  onPress={() => confirmDelete(service)}
-                  activeOpacity={0.7}
-                >
-                  <IconSymbol name="trash" size={18} color="#E53935" />
-                </TouchableOpacity>
-              </View>
-            </View>
+        {services.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <IconSymbol name="scissors" size={48} color={colors.icon} />
+            <Text style={[styles.emptyText, { color: colors.icon }]}>
+              No hay servicios registrados
+            </Text>
           </View>
-        ))}
+        ) : (
+          services.map((service) => (
+            <View
+              key={service.id}
+              style={[styles.serviceCard, { backgroundColor: colors.card }]}
+            >
+              <View style={styles.serviceHeader}>
+                <IconSymbol name="scissors" size={20} color="#D4AF37" />
+                <Text style={[styles.serviceName, { color: colors.text }]}>{service.name}</Text>
+              </View>
+
+              <View style={styles.serviceDetails}>
+                <View style={styles.serviceInfo}>
+                  <View style={styles.priceContainer}>
+                    <Text style={[styles.servicePrice, { color: '#4CAF50' }]}>
+                      ${service.price.toLocaleString()}
+                    </Text>
+                  </View>
+                  <View style={styles.durationContainer}>
+                    <IconSymbol name="clock" size={16} color={colors.icon} />
+                    <Text style={[styles.serviceDuration, { color: colors.icon }]}>
+                      {service.duration} min
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.actionsRow}>
+                  <TouchableOpacity 
+                    style={[styles.iconBtn, styles.editBtn]} 
+                    onPress={() => openEdit(service)}
+                    activeOpacity={0.7}
+                  >
+                    <IconSymbol name="pencil" size={18} color="#D4AF37" />
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={[styles.iconBtn, styles.deleteBtn]} 
+                    onPress={() => confirmDelete(service)}
+                    activeOpacity={0.7}
+                  >
+                    <IconSymbol name="trash" size={18} color="#E53935" />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          ))
+        )}
       </ScrollView>
 
       <Modal visible={modalVisible} animationType="slide" transparent>
@@ -245,6 +380,26 @@ const styles = StyleSheet.create({
   },
   servicesList: {
     flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 16,
+    textAlign: 'center',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 60,
+  },
+  emptyText: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginTop: 16,
   },
   addButton: {
     flexDirection: 'row',
@@ -371,8 +526,9 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     marginBottom: 16,
     fontSize: 16,
-    borderColor: '#E0E0E0',
-    backgroundColor: '#FAFAFA',
+    borderColor: '#D4AF37',
+    backgroundColor: '#000000',
+    color: '#D4AF37',
   },
   modalActions: {
     flexDirection: 'row',
