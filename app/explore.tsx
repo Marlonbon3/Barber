@@ -24,6 +24,7 @@ export default function BookAppointmentScreen() {
   const [selectedTime, setSelectedTime] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
   const [occupiedTimes, setOccupiedTimes] = useState<string[]>([]);
+  const [occupiedCountsByTime, setOccupiedCountsByTime] = useState<Record<string, number>>({});
   const [barbers, setBarbers] = useState<any[]>([]);
   const [loadingBarbers, setLoadingBarbers] = useState(true);
   const [services, setServices] = useState<any[]>([]);
@@ -110,6 +111,7 @@ export default function BookAppointmentScreen() {
             price: service.price || 0,
             duration: service.duration || 30,
             owner_id: service.owner_id || null,
+            icon: 'scissors'
           })) || [];
           
           setServices(mappedServices);
@@ -166,8 +168,15 @@ export default function BookAppointmentScreen() {
       if (selectedDate && selectedBarber) {
         const occupied = await fetchOccupiedTimes(selectedDate, String(selectedBarber.id));
         setOccupiedTimes(occupied);
+        setOccupiedCountsByTime({});
+      } else if (selectedDate && !selectedBarber) {
+        // Cuando no hay barbero seleccionado, consultar todas las citas para la fecha
+        const counts = await fetchOccupiedCountsByTime(selectedDate);
+        setOccupiedCountsByTime(counts);
+        setOccupiedTimes([]);
       } else {
         setOccupiedTimes([]);
+        setOccupiedCountsByTime({});
       }
     };
 
@@ -203,12 +212,87 @@ export default function BookAppointmentScreen() {
     return data?.map(appointment => appointment.time) || [];
   };
 
+  // Función para consultar la cantidad de barberos ocupados por hora para una fecha
+  const fetchOccupiedCountsByTime = async (date: string) => {
+    const formatDateForDB = (date: string) => {
+      const parts = date.split(', ')[1].split(' ');
+      const day = parts[0];
+      const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 
+                          'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+      const monthIndex = monthNames.indexOf(parts[1]);
+      const year = new Date().getFullYear();
+      return `${year}-${(monthIndex + 1).toString().padStart(2, '0')}-${day.padStart(2, '0')}`; // Formato YYYY-MM-DD
+    };
+
+    const formattedDate = formatDateForDB(date);
+
+    const { data, error } = await supabase
+      .from('appointments')
+      .select('time, barber_id')
+      .eq('date', formattedDate)
+      .neq('status', 'cancelled');
+
+    if (error || !data) {
+      return {};
+    }
+
+    // Contar barberos ocupados por cada hora
+    const counts: Record<string, number> = {};
+    const seenPairs = new Set<string>();
+    data.forEach((apt: any) => {
+      const key = `${apt.time}::${apt.barber_id}`;
+      if (!seenPairs.has(key)) {
+        seenPairs.add(key);
+        counts[apt.time] = (counts[apt.time] || 0) + 1;
+      }
+    });
+
+    return counts;
+  };
+
   // Filtrar horarios disponibles
-  const availableTimeSlots = timeSlots.filter(time => !occupiedTimes.includes(time));
-  
+  // Filtrar horarios disponibles y excluir horas pasadas si la fecha seleccionada es hoy
+  const availableTimeSlots = timeSlots.filter((time) => {
+    // Si hay un barbero seleccionado, usar occupiedTimes (por barbero)
+    if (selectedBarber) {
+      if (occupiedTimes.includes(time)) return false;
+    } else if (selectedDate) {
+      // Si no hay barbero seleccionado, usar counts por hora: si todos los barberos están ocupados, excluir
+      const occupiedCount = occupiedCountsByTime[time] || 0;
+      // Si conocemos la cantidad de barberos cargados, sólo mostrar si hay al menos un barbero libre
+      if (barbers && barbers.length > 0 && occupiedCount >= barbers.length) return false;
+    }
+
+    // Si no hay fecha seleccionada, mantener la lógica actual (se muestra mensaje en UI)
+    if (!selectedDate) return true;
+
+    // Determinar cuántos días desde hoy representa la fecha seleccionada usando el arreglo `dates`
+    const selectedIndex = dates.indexOf(selectedDate);
+    if (selectedIndex === -1) return true; // si no lo encontramos, no filtrar por tiempo
+
+    // Construir un objeto Date para el slot combinando la fecha seleccionada y la hora del slot
+    const now = new Date();
+    const slotDate = new Date(now);
+    slotDate.setDate(now.getDate() + selectedIndex);
+
+    // Parsear la hora (p.ej. "9:30 AM") a hora y minutos 24h
+    const [timePart, meridiem] = time.split(' ');
+    const [hourStr, minuteStr] = timePart.split(':');
+    let hour = parseInt(hourStr, 10);
+    const minute = parseInt(minuteStr || '0', 10);
+    const m = (meridiem || '').toUpperCase();
+    if (m === 'PM' && hour !== 12) hour += 12;
+    if (m === 'AM' && hour === 12) hour = 0;
+
+    slotDate.setHours(hour, minute, 0, 0);
+
+    // Mantener el slot sólo si está en el futuro respecto a ahora
+    return slotDate > now;
+  });
+
   console.log('🕐 Horarios totales:', timeSlots);
   console.log('🚫 Horarios ocupados:', occupiedTimes);
-  console.log('✅ Horarios disponibles:', availableTimeSlots);
+  console.log('✅ Horarios disponibles (filtrados):', availableTimeSlots);
 
   const handleNext = () => {
     if (step < 4) {
@@ -577,7 +661,7 @@ export default function BookAppointmentScreen() {
                 </View>
                 <View style={styles.summaryRow}>
                   <Text style={[styles.summaryLabel, { color: colors.icon }]}>Duración:</Text>
-                  <Text style={[styles.summaryValue, { color: colors.text }]}>{selectedService?.duration} min</Text>
+                  <Text style={[styles.summaryValue, { color: colors.text }]}>{selectedService?.duration}</Text>
                 </View>
                 <View style={[styles.summaryRow, styles.totalRow]}>
                   <Text style={[styles.summaryLabel, styles.totalLabel, { color: colors.text }]}>Total:</Text>

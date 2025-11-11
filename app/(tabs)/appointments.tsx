@@ -1,3 +1,4 @@
+
 import { AppointmentCard } from '@/components/barberia/AppointmentCard';
 import { CustomButton } from '@/components/barberia/CustomButton';
 import { ThemedText } from '@/components/themed-text';
@@ -110,11 +111,30 @@ export default function AppointmentsScreen() {
 
   // Función para formatear la fecha
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
+    // Normalizar casos donde la fecha viene como 'YYYY-MM-DD' o 'YYYY-MM-DDTHH:MM:SSZ'
+    // Para evitar errores por timezone (new Date('YYYY-MM-DD') interpreta como UTC) parseamos la parte YYYY-MM-DD
+    let ymd = dateString;
+    if (!ymd) return '';
+    if (ymd.includes('T')) {
+      ymd = ymd.split('T')[0];
+    }
+
+    const parts = ymd.split('-');
+    if (parts.length !== 3) {
+      // fallback: intentar construir con Date directamente
+      const fallback = new Date(dateString);
+      return fallback.toDateString() === new Date().toDateString() ? 'Hoy' : fallback.toDateString();
+    }
+
+    const year = Number.parseInt(parts[0], 10);
+    const month = Number.parseInt(parts[1], 10) - 1; // month index 0-based
+    const day = Number.parseInt(parts[2], 10);
+
+    const date = new Date(year, month, day);
     const today = new Date();
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
-    
+
     const dayNames = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
     const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
 

@@ -50,7 +50,7 @@ export function ServiceCard({ service, onPress }: ServiceCardProps) {
           <View style={styles.durationContainer}>
             <IconSymbol name="clock" size={16} color={colors.icon} />
             <Text style={[styles.duration, { color: colors.icon }]}>
-              {service.duration} min
+              {service.duration}
             </Text>
           </View>
         </View>

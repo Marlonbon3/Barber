@@ -95,19 +95,7 @@ export function AppointmentCard({ appointment, onEdit, onCancel }: AppointmentCa
         </Text>
         
         {appointment.status === 'confirmed' && (
-          <View style={styles.actions}>
-            {onEdit && (
-              <TouchableOpacity 
-                style={[styles.actionButton, { borderColor: colors.primary }]}
-                onPress={onEdit}
-              >
-                <IconSymbol name="pencil" size={16} color={colors.primary} />
-                <Text style={[styles.actionText, { color: colors.primary }]}>
-                  Editar
-                </Text>
-              </TouchableOpacity>
-            )}
-            
+          <View style={styles.actions}>            
             {onCancel && (
               <TouchableOpacity 
                 style={[styles.actionButton, { borderColor: '#F44336' }]}
