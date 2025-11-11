@@ -12,6 +12,8 @@ interface Appointment {
   time: string;
   price: number;
   status: 'confirmed' | 'pending' | 'completed' | 'cancelled';
+  cancelled_by?: string;
+  cancelled_reason?: string;
 }
 
 interface AppointmentCardProps {
@@ -88,6 +90,16 @@ export function AppointmentCard({ appointment, onEdit, onCancel }: AppointmentCa
           </Text>
         </View>
       </View>
+
+      {/* Mostrar información de cancelación si aplica */}
+      {appointment.status === 'cancelled' && appointment.cancelled_reason && (
+        <View style={[styles.cancellationInfo, { backgroundColor: '#F44336' + '10', borderColor: '#F44336' + '30' }]}>
+          <IconSymbol name="info.circle" size={14} color="#F44336" />
+          <Text style={[styles.cancellationText, { color: '#F44336' }]}>
+            {appointment.cancelled_reason}
+          </Text>
+        </View>
+      )}
 
       <View style={styles.footer}>
         <Text style={[styles.price, { color: colors.primary }]}>
@@ -200,5 +212,18 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '500',
     marginLeft: 4,
+  },
+  cancellationInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 8,
+    marginBottom: 12,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  cancellationText: {
+    fontSize: 12,
+    marginLeft: 6,
+    fontWeight: '500',
   },
 });

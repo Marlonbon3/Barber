@@ -79,7 +79,16 @@ export default function BookAppointmentScreen() {
 
   const dates = generateDates();
 
-
+  // Función auxiliar para formatear fecha para la base de datos
+  const formatDateForDB = (date: string) => {
+    const parts = date.split(', ')[1].split(' ');
+    const day = parts[0];
+    const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 
+                        'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+    const monthIndex = monthNames.indexOf(parts[1]);
+    const year = new Date().getFullYear();
+    return `${year}-${(monthIndex + 1).toString().padStart(2, '0')}-${day.padStart(2, '0')}`; // Formato YYYY-MM-DD
+  };
 
   const handleNotesChange = (text: string) => {
     // Limitar a 200 caracteres para las notas
@@ -87,6 +96,10 @@ export default function BookAppointmentScreen() {
       setNotes(text);
     }
   };
+
+
+
+
 
   // useEffect para cargar servicios al iniciar el componente
   useEffect(() => {
@@ -184,52 +197,99 @@ export default function BookAppointmentScreen() {
     loadOccupiedTimes();
   }, [selectedDate, selectedBarber]);
 
-  // Función para consultar horas ocupadas
+  // Función para consultar horas ocupadas incluyendo duración del servicio
   const fetchOccupiedTimes = async (date: string, barberId: string) => {
-    const formatDateForDB = (date: string) => {
-      const parts = date.split(', ')[1].split(' ');
-      const day = parts[0];
-      const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 
-                          'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-      const monthIndex = monthNames.indexOf(parts[1]);
-      const year = new Date().getFullYear();
-      return `${year}-${(monthIndex + 1).toString().padStart(2, '0')}-${day.padStart(2, '0')}`; // Formato YYYY-MM-DD
-    };
-
     const formattedDate = formatDateForDB(date);
-    
     
     const { data, error } = await supabase
       .from('appointments')
-      .select('time')
+      .select(`
+        time,
+        services (
+          duration
+        )
+      `)
       .eq('date', formattedDate)
       .eq('barber_id', barberId)
       .neq('status', 'cancelled'); // Excluir citas canceladas
     
-    if (error) {
+    if (error || !data) {
       return [];
     }
     
-    return data?.map(appointment => appointment.time) || [];
+    // Calcular todas las horas que deben estar bloqueadas
+    const blockedTimes = new Set<string>();
+    
+    for (const appointment of data) {
+      const startTime = appointment.time;
+      const duration = (appointment.services as any)?.duration || 30;
+      
+      console.log(`🔒 Procesando cita: ${startTime} (${duration} min)`);
+      
+      // Calcular cuántos slots de 30 minutos ocupará esta cita
+      const slotsToBlock = Math.ceil(duration / 30);
+      const startMinutes = convertTimeToMinutes(startTime);
+      
+      // Bloquear todos los slots necesarios (incluyendo el de inicio)
+      for (let i = 0; i < slotsToBlock; i++) {
+        const slotMinutes = startMinutes + (i * 30);
+        const slotTime = convertMinutesToTime(slotMinutes);
+        if (slotTime && timeSlots.includes(slotTime)) {
+          blockedTimes.add(slotTime);
+          console.log(`🚫 Bloqueando slot: ${slotTime}`);
+        }
+      }
+    }
+    
+    console.log('🚫 Horarios bloqueados finales:', Array.from(blockedTimes));
+    return Array.from(blockedTimes);
+  };
+
+
+
+  // Función auxiliar para convertir tiempo a minutos
+  const convertTimeToMinutes = (time: string): number => {
+    const [timePart, meridiem] = time.split(' ');
+    const [hourStr, minuteStr] = timePart.split(':');
+    let hour = Number.parseInt(hourStr, 10);
+    const minute = Number.parseInt(minuteStr || '0', 10);
+    
+    if (meridiem === 'PM' && hour !== 12) hour += 12;
+    if (meridiem === 'AM' && hour === 12) hour = 0;
+    
+    return hour * 60 + minute;
+  };
+
+  // Función auxiliar para convertir minutos a tiempo
+  const convertMinutesToTime = (totalMinutes: number): string | null => {
+    if (totalMinutes >= 24 * 60) return null; // No permitir horas después de medianoche
+    
+    const hour = Math.floor(totalMinutes / 60);
+    const minute = totalMinutes % 60;
+    
+    let displayHour = hour;
+    const meridiem = hour >= 12 ? 'PM' : 'AM';
+    
+    if (hour === 0) displayHour = 12;
+    else if (hour > 12) displayHour = hour - 12;
+    
+    const timeString = `${displayHour}:${minute.toString().padStart(2, '0')} ${meridiem}`;
+    return timeString;
   };
 
   // Función para consultar la cantidad de barberos ocupados por hora para una fecha
   const fetchOccupiedCountsByTime = async (date: string) => {
-    const formatDateForDB = (date: string) => {
-      const parts = date.split(', ')[1].split(' ');
-      const day = parts[0];
-      const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 
-                          'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-      const monthIndex = monthNames.indexOf(parts[1]);
-      const year = new Date().getFullYear();
-      return `${year}-${(monthIndex + 1).toString().padStart(2, '0')}-${day.padStart(2, '0')}`; // Formato YYYY-MM-DD
-    };
-
     const formattedDate = formatDateForDB(date);
 
     const { data, error } = await supabase
       .from('appointments')
-      .select('time, barber_id')
+      .select(`
+        time, 
+        barber_id,
+        services (
+          duration
+        )
+      `)
       .eq('date', formattedDate)
       .neq('status', 'cancelled');
 
@@ -237,16 +297,34 @@ export default function BookAppointmentScreen() {
       return {};
     }
 
-    // Contar barberos ocupados por cada hora
-    const counts: Record<string, number> = {};
-    const seenPairs = new Set<string>();
-    data.forEach((apt: any) => {
-      const key = `${apt.time}::${apt.barber_id}`;
-      if (!seenPairs.has(key)) {
-        seenPairs.add(key);
-        counts[apt.time] = (counts[apt.time] || 0) + 1;
+    // Contar barberos ocupados por cada hora considerando la duración
+    const barberOccupiedSlots = new Set<string>();
+    
+    for (const apt of data) {
+      const startTime = apt.time;
+      const barberId = apt.barber_id;
+      const duration = (apt.services as any)?.duration || 30;
+      
+      // Calcular cuántos slots de 30 minutos ocupará esta cita
+      const slotsToBlock = Math.ceil(duration / 30);
+      const startMinutes = convertTimeToMinutes(startTime);
+      
+      // Marcar todos los slots ocupados por este barbero
+      for (let i = 0; i < slotsToBlock; i++) {
+        const slotMinutes = startMinutes + (i * 30);
+        const slotTime = convertMinutesToTime(slotMinutes);
+        if (slotTime && timeSlots.includes(slotTime)) {
+          barberOccupiedSlots.add(`${slotTime}::${barberId}`);
+        }
       }
-    });
+    }
+
+    // Contar cuántos barberos están ocupados por hora
+    const counts: Record<string, number> = {};
+    for (const entry of barberOccupiedSlots) {
+      const [time] = entry.split('::');
+      counts[time] = (counts[time] || 0) + 1;
+    }
 
     return counts;
   };
@@ -279,8 +357,8 @@ export default function BookAppointmentScreen() {
     // Parsear la hora (p.ej. "9:30 AM") a hora y minutos 24h
     const [timePart, meridiem] = time.split(' ');
     const [hourStr, minuteStr] = timePart.split(':');
-    let hour = parseInt(hourStr, 10);
-    const minute = parseInt(minuteStr || '0', 10);
+    let hour = Number.parseInt(hourStr, 10);
+    const minute = Number.parseInt(minuteStr || '0', 10);
     const m = (meridiem || '').toUpperCase();
     if (m === 'PM' && hour !== 12) hour += 12;
     if (m === 'AM' && hour === 12) hour = 0;
@@ -307,64 +385,62 @@ export default function BookAppointmentScreen() {
     }
   };
 
-  const handleBookAppointment = () => {
+  const handleBookAppointment = async () => {
     if (!user) {
       Alert.alert('Error', 'Debes iniciar sesión para agendar una cita');
       return;
     }
 
-    const formatDateForDB = (date: string) => {
-      const parts = date.split(', ')[1].split(' ');
-      const day = parts[0];
-      const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 
-                          'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-      const monthIndex = monthNames.indexOf(parts[1]);
-      const year = new Date().getFullYear();
-      return `${year}-${(monthIndex + 1).toString().padStart(2, '0')}-${day.padStart(2, '0')}`; // Formato YYYY-MM-DD
-    }
-
-    const appointmentDate = formatDateForDB(selectedDate);
-
-    // Guardar cita en supabase
-    const saveAppointment = async () => {
-
-      const appointmentData = {
-        service_id: String(selectedService.id),
-        barber_id: String(selectedBarber.id),
-        date: appointmentDate,
-        time: selectedTime,
-        price: selectedService?.price,
-        customer_name: user.user_metadata?.full_name || user.email || 'Usuario',
-        customer_phone: user.user_metadata?.phone || user.phone || '',
-        notes: notes,
-        status: 'confirmed',
-        user_id: customerid
-      };
-
-      const { error } = await supabase
+    // Validar que el usuario no tenga más de 3 citas activas
+    try {
+      const { data: existingAppointments, error: countError } = await supabase
         .from('appointments')
-        .insert([appointmentData]);
-      
-      if (error) {
-        console.error('Error al guardar la cita:', error);
-        Alert.alert('Error', 'No se pudo agendar la cita. Intenta nuevamente.');
+        .select('id')
+        .eq('user_id', customerid)
+        .in('status', ['confirmed', 'pending', 'in_progress']);
+
+      if (countError) {
+        console.error('Error al verificar citas existentes:', countError);
+        Alert.alert('Error', 'Error al validar las citas existentes. Intenta nuevamente.');
         return;
       }
-    };
 
-    saveAppointment();
+      if (existingAppointments && existingAppointments.length >= 3) {
+        Alert.alert(
+          'Límite de citas alcanzado',
+          'Ya tienes 3 citas activas. Cancela o completa alguna cita existente antes de agendar una nueva.',
+          [
+            { 
+              text: 'Ver mis citas', 
+              onPress: () => router.push('/(tabs)/appointments')
+            },
+            { text: 'OK' }
+          ]
+        );
+        return;
+      }
+    } catch (error) {
+      console.error('Error inesperado al validar citas:', error);
+      Alert.alert('Error', 'Error inesperado. Intenta nuevamente.');
+      return;
+    }
 
-    Alert.alert(
-      'Cita Agendada',
-      `Tu cita ha sido agendada exitosamente!\n\nServicio: ${selectedService?.name}\nBarbero: ${selectedBarber?.name}\nFecha: ${selectedDate}\nHora: ${selectedTime}\nPrecio: $${selectedService?.price}`,
-      [{ 
-        text: 'OK', 
-        onPress: () => {
-          resetForm();
-          router.push('/(tabs)/appointments');
-        }
-      }]
-    );
+    // Navegar a la pantalla de pago con todos los datos de la cita
+    const appointmentDate = formatDateForDB(selectedDate);
+    
+    router.push({
+      pathname: '/payment',
+      params: {
+        serviceId: selectedService.id.toString(),
+        serviceName: selectedService.name,
+        servicePrice: selectedService.price.toString(),
+        barberId: selectedBarber.id,
+        barberName: selectedBarber.name,
+        selectedDate: appointmentDate,
+        selectedTime: selectedTime,
+        notes: notes,
+      }
+    });
   };
 
   const resetForm = () => {
@@ -719,7 +795,7 @@ export default function BookAppointmentScreen() {
           />
         ) : (
           <CustomButton
-            title="Confirmar Cita"
+            title="Proceder al Pago"
             onPress={handleBookAppointment}
             disabled={!canProceed()}
             style={styles.navButton}

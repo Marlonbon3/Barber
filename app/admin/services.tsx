@@ -36,6 +36,21 @@ export default function ServicesManagement() {
   const [name, setName] = useState('');
   const [price, setPrice] = useState('');
   const [duration, setDuration] = useState('');
+  const [durationPickerVisible, setDurationPickerVisible] = useState(false);
+
+  // Opciones de duración predefinidas (en minutos)
+  const durationOptions = [
+    { label: '15 minutos', value: 15 },
+    { label: '30 minutos', value: 30 },
+    { label: '45 minutos', value: 45 },
+    { label: '1 hora', value: 60 },
+    { label: '1 hora 15 min', value: 75 },
+    { label: '1 hora 30 min', value: 90 },
+    { label: '1 hora 45 min', value: 105 },
+    { label: '2 horas', value: 120 },
+    { label: '2 horas 30 min', value: 150 },
+    { label: '3 horas', value: 180 },
+  ];
 
   useEffect(() => {
     loadServices();
@@ -72,11 +87,26 @@ export default function ServicesManagement() {
     }
   };
 
+  // Función para formatear la duración para mostrar
+  const formatDuration = (minutes: number) => {
+    if (minutes < 60) {
+      return `${minutes} minutos`;
+    } else if (minutes === 60) {
+      return '1 hora';
+    } else if (minutes % 60 === 0) {
+      return `${minutes / 60} horas`;
+    } else {
+      const hours = Math.floor(minutes / 60);
+      const mins = minutes % 60;
+      return `${hours} hora${hours > 1 ? 's' : ''} ${mins} min`;
+    }
+  };
+
   const openAdd = () => {
     setEditing(null);
     setName('');
     setPrice('');
-    setDuration('');
+    setDuration('30'); // Duración por defecto de 30 minutos
     setModalVisible(true);
   };
 
@@ -86,6 +116,11 @@ export default function ServicesManagement() {
     setPrice(String(s.price));
     setDuration(String(s.duration));
     setModalVisible(true);
+  };
+
+  const selectDuration = (durationValue: number) => {
+    setDuration(String(durationValue));
+    setDurationPickerVisible(false);
   };
 
   const saveService = async () => {
@@ -307,13 +342,15 @@ export default function ServicesManagement() {
               onChangeText={setPrice}
               style={[styles.input, { color: colors.text, borderColor: colors.border }]}
             />
-            <TextInput
-              placeholder="Duración"
-              placeholderTextColor={colors.icon}
-              value={duration}
-              onChangeText={setDuration}
-              style={[styles.input, { color: colors.text, borderColor: colors.border }]}
-            />
+            <TouchableOpacity
+              style={[styles.durationButton, { borderColor: colors.border }]}
+              onPress={() => setDurationPickerVisible(true)}
+            >
+              <Text style={[styles.durationButtonText, { color: colors.text }]}>
+                {duration ? formatDuration(Number.parseInt(duration, 10)) : 'Seleccionar duración'}
+              </Text>
+              <IconSymbol name="chevron.right" size={16} color={colors.icon} />
+            </TouchableOpacity>
 
             <View style={styles.modalActions}>
               <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.modalBtnSecondary}>
@@ -323,6 +360,54 @@ export default function ServicesManagement() {
                 <Text style={[styles.modalBtnText, { color: '#fff' }]}>{editing ? 'Guardar' : 'Agregar'}</Text>
               </TouchableOpacity>
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal del Picker de Duración */}
+      <Modal visible={durationPickerVisible} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.pickerModalContent, { backgroundColor: colors.card }]}>
+            <Text style={[styles.pickerModalTitle, { color: colors.text }]}>Seleccionar Duración</Text>
+            
+            <ScrollView style={styles.optionsList} showsVerticalScrollIndicator={false}>
+              {durationOptions.map((option) => (
+                <TouchableOpacity
+                  key={option.value}
+                  style={[
+                    styles.optionItem,
+                    { 
+                      backgroundColor: Number.parseInt(duration, 10) === option.value 
+                        ? 'rgba(212, 175, 55, 0.2)' 
+                        : 'transparent',
+                      borderColor: colors.border
+                    }
+                  ]}
+                  onPress={() => selectDuration(option.value)}
+                >
+                  <Text style={[
+                    styles.optionText, 
+                    { 
+                      color: Number.parseInt(duration, 10) === option.value 
+                        ? '#D4AF37' 
+                        : colors.text 
+                    }
+                  ]}>
+                    {option.label}
+                  </Text>
+                  {Number.parseInt(duration, 10) === option.value && (
+                    <IconSymbol name="checkmark.circle.fill" size={20} color="#D4AF37" />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            <TouchableOpacity 
+              onPress={() => setDurationPickerVisible(false)} 
+              style={[styles.closePickerButton, { backgroundColor: colors.border }]}
+            >
+              <Text style={[styles.closePickerText, { color: colors.text }]}>Cancelar</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -563,5 +648,70 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: 16,
     color: '#D4AF37',
+  },
+  // Estilos para el botón de duración
+  durationButton: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    marginBottom: 16,
+    backgroundColor: '#000000',
+    borderColor: '#D4AF37',
+  },
+  durationButtonText: {
+    fontSize: 16,
+    color: '#D4AF37',
+  },
+  // Estilos para el modal del picker
+  pickerModalContent: {
+    width: '90%',
+    maxWidth: 400,
+    borderRadius: 20,
+    padding: 25,
+    maxHeight: '80%',
+    elevation: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 15,
+  },
+  pickerModalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    marginBottom: 20,
+    textAlign: 'center',
+    color: '#D4AF37',
+  },
+  optionsList: {
+    maxHeight: 300,
+    marginBottom: 20,
+  },
+  optionItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    marginBottom: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  optionText: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  closePickerButton: {
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  closePickerText: {
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

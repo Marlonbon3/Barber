@@ -44,6 +44,7 @@ export default function AdminLayout() {
           <Stack.Screen name="services" />
           <Stack.Screen name="appointments" />
           <Stack.Screen name="barbers" />
+          <Stack.Screen name="history" />
         </Stack>
       </View>
     </View>

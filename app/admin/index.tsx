@@ -5,7 +5,7 @@ import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-nati
 import { IconSymbol } from '../../components/ui/icon-symbol';
 import { Colors } from '../../constants/theme';
 import { useColorScheme } from '../../hooks/use-color-scheme';
-import { Image } from 'expo-image';
+
 
 export default function AdminDashboard() {
   const colorScheme = useColorScheme();
@@ -14,12 +14,16 @@ export default function AdminDashboard() {
   // fetch a la base de datos tabla appointments
     const [appointments, setAppointments] = useState<any[]>([]);
     const [barberID, setBarberID] = useState<string | null>(null);
+    const [isOwner, setIsOwner] = useState(false);
     
     // useEffect para obtener el barberID del usuario autenticado
     useEffect(() => {
       const getCurrentUser = async () => {
         const { data: { user } } = await supabase.auth.getUser();
         setBarberID(user?.id || null);
+        
+        // Verificar si es el dueño (jaimeb@gmail.com)
+        setIsOwner(user?.email === 'jaimeb@gmail.com');
       };
       
       getCurrentUser();
@@ -46,13 +50,25 @@ export default function AdminDashboard() {
             )
           `)
           .order('time', { ascending: true })
-          .eq('barber_id', barberID);
+          .eq('barber_id', barberID)
+          .neq('status', 'cancelled'); // Excluir citas canceladas
           
         if (error) {
           console.error('Error fetching appointments:', error);
           setAppointments([]);
         } else {
           console.log('✅ Citas cargadas:', data);
+          // Función para obtener el texto del estado
+          const getStatusText = (status: string) => {
+            switch (status) {
+              case 'confirmed': return 'Confirmada';
+              case 'pending': return 'Pendiente';
+              case 'in_progress': return 'En Proceso';
+              case 'completed': return 'Completada';
+              default: return 'Pendiente';
+            }
+          };
+
           // Mapear los datos para que coincidan con la estructura esperada en la UI
           const mappedAppointments = data?.map(appointment => ({
             id: appointment.id,
@@ -61,9 +77,7 @@ export default function AdminDashboard() {
             time: appointment.time,
             barber: 'Barbero', // En este caso el barbero es el usuario actual
             price: `$${appointment.services?.price || appointment.price || 0}`,
-            status: appointment.status === 'confirmed' ? 'Confirmada' : 
-                    appointment.status === 'pending' ? 'Pendiente' : 
-                    appointment.status === 'in_progress' ? 'En Proceso' : 'Pendiente',
+            status: getStatusText(appointment.status),
             date: appointment.date,
             notes: appointment.notes,
             customer_phone: appointment.customer_phone,
@@ -96,7 +110,8 @@ export default function AdminDashboard() {
     }
   };
 
-  const menuOptions = [
+  // Opciones del menú dinámicas según el tipo de usuario
+  const baseMenuOptions = [
     {
       title: 'Gestionar Servicios',
       subtitle: 'Agregar, editar o eliminar servicios',
@@ -111,14 +126,20 @@ export default function AdminDashboard() {
       route: '/admin/appointments',
       color: '#4CAF50',
     },
+  ];
+
+  // Solo el dueño puede gestionar barberos
+  const ownerOnlyOptions = [
     {
       title: 'Gestionar Barberos',
-      subtitle: 'Administrar información del equipo',
+      subtitle: 'Administrar información del equipo (Máx. 4 barberos)',
       icon: 'person.3',
       route: '/admin/barbers',
       color: '#2196F3',
     },
   ];
+
+  const menuOptions = isOwner ? [...baseMenuOptions, ...ownerOnlyOptions] : baseMenuOptions;
 
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>

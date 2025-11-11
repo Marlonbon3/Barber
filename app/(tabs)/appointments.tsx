@@ -9,7 +9,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { supabase } from '@/utils/database';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, Modal, RefreshControl, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 
 interface Appointment {
   id: string;
@@ -29,6 +29,7 @@ export default function AppointmentsScreen() {
   const [appointments, setAppointments] = useState<any[]>([]);
   const [loadingAppointments, setLoadingAppointments] = useState(true);
   const [customerid, setCustomerid] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
   
   // Estados para el modal de edición
   const [editModalVisible, setEditModalVisible] = useState(false);
@@ -46,14 +47,18 @@ export default function AppointmentsScreen() {
   }, []);
 
   // Función reutilizable para cargar citas
-  const reloadAppointments = useCallback(async () => {
+  const reloadAppointments = useCallback(async (isRefreshing = false) => {
     if (!customerid) {
       console.log('⏳ Esperando customerid...');
       return;
     }
 
     try {
-      setLoadingAppointments(true);
+      if (isRefreshing) {
+        setRefreshing(true);
+      } else {
+        setLoadingAppointments(true);
+      }
       console.log('🔍 Cargando citas desde la base de datos para el usuario:', customerid);
       
       const { data, error } = await supabase
@@ -71,6 +76,7 @@ export default function AppointmentsScreen() {
           )
         `)
         .eq('user_id', customerid)
+        .eq('status', 'confirmed') // Solo citas confirmadas en "Mis Citas"
         .order('date', { ascending: true })
         .order('time', { ascending: true });
       
@@ -100,9 +106,18 @@ export default function AppointmentsScreen() {
       console.error('❌ Error inesperado al cargar citas:', error);
       setAppointments([]);
     } finally {
-      setLoadingAppointments(false);
+      if (isRefreshing) {
+        setRefreshing(false);
+      } else {
+        setLoadingAppointments(false);
+      }
     }
   }, [customerid]);
+
+  // Función para refresh manual
+  const onRefresh = useCallback(() => {
+    reloadAppointments(true);
+  }, [reloadAppointments]);
 
   // useEffect para cargar las citas al iniciar el componente
   useEffect(() => {
@@ -203,14 +218,36 @@ export default function AppointmentsScreen() {
     setEditingNotes('');
   };
 
+  const confirmCancelAppointment = (appointment: any) => {
+    Alert.alert(
+      'Cancelar Cita',
+      `¿Estás seguro de que quieres cancelar tu cita?\n\nServicio: ${appointment.services?.name}\nBarbero: ${appointment.profiles?.first_name} ${appointment.profiles?.last_name}\nFecha: ${appointment.date}\nHora: ${appointment.time}\nPrecio: $${appointment.price}\n\nEsta acción no se puede deshacer.`,
+      [
+        {
+          text: 'No, mantener cita',
+          style: 'cancel'
+        },
+        {
+          text: 'Sí, cancelar',
+          style: 'destructive',
+          onPress: () => handleCancelAppointment(appointment.id)
+        }
+      ]
+    );
+  };
+
   const handleCancelAppointment = async (appointmentId: string) => {
     console.log('Cancelar cita:', appointmentId);
     
     try {
-      // Actualizar el status de la cita a 'cancelled'
+      // Actualizar el status de la cita a 'cancelled' con información de cancelación por usuario
       const { error } = await supabase
         .from('appointments')
-        .update({ status: 'cancelled' })
+        .update({ 
+          status: 'cancelled',
+          cancelled_by: 'user',
+          cancelled_reason: 'Cancelada por usuario'
+        })
         .eq('id', appointmentId)
         .eq('user_id', customerid); // Asegurar que solo el usuario pueda cancelar sus citas
       
@@ -237,6 +274,11 @@ export default function AppointmentsScreen() {
     router.push('/explore');
   };
 
+  const handleViewHistory = () => {
+    // Navegar a la pantalla de historial
+    router.push('/history');
+  };
+
   if (loadingAppointments) {
     return (
       <ThemedView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -252,7 +294,18 @@ export default function AppointmentsScreen() {
 
   return (
     <ThemedView style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        style={styles.scrollView} 
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={['#D4AF37']}
+            tintColor="#D4AF37"
+          />
+        }
+      >
         <ThemedView style={styles.header}>
           <ThemedText type="title" style={styles.title}>
             Mis Citas
@@ -263,20 +316,31 @@ export default function AppointmentsScreen() {
         </ThemedView>
 
         {appointments.length === 0 ? (
-          <ThemedView style={styles.emptyContainer}>
-            <IconSymbol name="calendar.badge.clock" size={80} color={colors.icon} />
-            <ThemedText type="subtitle" style={[styles.emptyTitle, { color: colors.text }]}>
-              No tienes citas agendadas
-            </ThemedText>
-            <ThemedText style={[styles.emptySubtitle, { color: colors.icon }]}>
-              ¡Agenda tu primera cita y disfruta de nuestros servicios!
-            </ThemedText>
-            <CustomButton
-              title="Agendar Cita"
-              onPress={handleScheduleNew}
-              style={styles.emptyButton}
-            />
-          </ThemedView>
+          <>
+            <ThemedView style={styles.emptyContainer}>
+              <IconSymbol name="calendar.badge.clock" size={80} color={colors.icon} />
+              <ThemedText type="subtitle" style={[styles.emptyTitle, { color: colors.text }]}>
+                No tienes citas agendadas
+              </ThemedText>
+              <ThemedText style={[styles.emptySubtitle, { color: colors.icon }]}>
+                ¡Agenda tu primera cita y disfruta de nuestros servicios!
+              </ThemedText>
+            </ThemedView>
+            
+            <View style={styles.buttonContainer}>
+              <CustomButton
+                title="Agendar Cita"
+                onPress={handleScheduleNew}
+                size="large"
+              />
+              <CustomButton
+                title="Historial de Citas"
+                onPress={handleViewHistory}
+                variant="outline"
+                size="large"
+              />
+            </View>
+          </>
         ) : (
           <>
             {upcomingAppointments.length > 0 && (
@@ -289,7 +353,7 @@ export default function AppointmentsScreen() {
                     key={appointment.id}
                     appointment={appointment}
                     onEdit={() => handleEditAppointment(appointment.id)}
-                    onCancel={() => handleCancelAppointment(appointment.id)}
+                    onCancel={() => confirmCancelAppointment(appointment)}
                   />
                 ))}
               </ThemedView>
@@ -297,25 +361,32 @@ export default function AppointmentsScreen() {
 
             {pastAppointments.length > 0 && (
               <ThemedView style={styles.section}>
-                <ThemedText type="subtitle" style={styles.sectionTitle}>
-                  Historial
-                </ThemedText>
                 {pastAppointments.map((appointment) => (
                   <AppointmentCard
                     key={appointment.id}
                     appointment={appointment}
                     onEdit={() => handleEditAppointment(appointment.id)}
-                    onCancel={() => handleCancelAppointment(appointment.id)}
+                    onCancel={() => confirmCancelAppointment(appointment)}
                   />
                 ))}
               </ThemedView>
             )}
 
-            <CustomButton
-              title="Agendar Nueva Cita"
-              onPress={handleScheduleNew}
-              style={styles.newAppointmentButton}
-            />
+            <View style={styles.buttonContainer}>
+              <CustomButton
+                title="Agendar Cita"
+                onPress={handleScheduleNew}
+                size="large"
+                style={styles.primaryButton}
+              />
+              <CustomButton
+                title="Historial de Citas"
+                onPress={handleViewHistory}
+                variant="outline"
+                size="large"
+                style={styles.historyButton}
+              />
+            </View>
           </>
         )}
 
@@ -329,16 +400,6 @@ export default function AppointmentsScreen() {
           <ThemedText style={[styles.infoText, { color: colors.icon }]}>
             • Cancelaciones tardías pueden aplicar un cargo del 50%
           </ThemedText>
-          <ThemedText style={[styles.infoText, { color: colors.icon }]}>
-            • Para reagendar, contacta directamente a la barbería
-          </ThemedText>
-          
-          <View style={styles.contactInfo}>
-            <IconSymbol name="phone.fill" size={16} color={colors.primary} />
-            <Text style={[styles.contactText, { color: colors.primary }]}>
-              +1 (555) 123-4567
-            </Text>
-          </View>
         </ThemedView>
       </ScrollView>
 
@@ -474,16 +535,6 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     lineHeight: 20,
   },
-  contactInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 12,
-  },
-  contactText: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginLeft: 8,
-  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -563,5 +614,23 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#fff',
+  },
+  buttonContainer: {
+    flexDirection: 'column',
+    gap: 12,
+    marginBottom: 20,
+    paddingHorizontal: 20,
+  },
+  actionButton: {
+    flex: 1,
+  },
+  primaryButton: {
+    // Usar tamaño por defecto del CustomButton
+  },
+  historyButton: {
+    // Usar tamaño por defecto del CustomButton
+  },
+  secondaryButton: {
+    // Se mantiene el estilo outline del CustomButton
   },
 });
