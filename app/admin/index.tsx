@@ -57,7 +57,7 @@ export default function AdminDashboard() {
           console.error('Error fetching appointments:', error);
           setAppointments([]);
         } else {
-          console.log('✅ Citas cargadas:', data);
+          console.log('✅ Citas cargadas');
           // Función para obtener el texto del estado
           const getStatusText = (status: string) => {
             switch (status) {
