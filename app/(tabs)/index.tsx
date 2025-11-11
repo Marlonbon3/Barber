@@ -404,7 +404,7 @@ export default function HomeScreen() {
               }]}>
                 Sesión iniciada como: {user.email}
               </ThemedText>
-              
+          
               <CustomButton
                 title="Cerrar Sesión"
                 onPress={handleLogout}
@@ -683,5 +683,9 @@ const styles = StyleSheet.create({
   },
   logoutButtonFull: {
     width: '100%',
+  },
+  adminButton: {
+    width: '100%',
+    marginBottom: 10,
   },
 });
