@@ -276,6 +276,19 @@ export default function AppointmentsManagement() {
             ))}
           </View>
         )}
+
+        {
+          // Si no hay citas en ninguna categoría
+          pendingAppointments.length === 0 &&
+          confirmedAppointments.length === 0 &&
+          inProcessAppointments.length === 0 && (
+            <View style={styles.section}>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                No hay citas en este momento.
+              </Text>
+            </View>
+          )
+        }
       </ScrollView>
     </View>
   );
