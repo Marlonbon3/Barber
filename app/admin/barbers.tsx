@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { IconSymbol } from '../../components/ui/icon-symbol';
 import { Colors } from '../../constants/theme';
 import { useColorScheme } from '../../hooks/use-color-scheme';
@@ -10,13 +10,9 @@ interface Barber {
   id: string;
   first_name: string;
   last_name: string;
-  email: string;
   phone: string | null;
-  specialties: string[];
-  rating: number;
-  experience: string;
+  role: string;
   status: 'active' | 'inactive';
-  avatar_url: string | null;
 }
 
 export default function BarbersManagement() {
@@ -31,8 +27,23 @@ export default function BarbersManagement() {
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
-  const [experience, setExperience] = useState('');
-  const [specialtiesText, setSpecialtiesText] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+
+  // Verificar si el usuario es el dueño
+  useEffect(() => {
+    const checkOwner = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      // Si no es el dueño, redirigir
+      if (user?.email !== 'jaimeb@gmail.com') {
+        Alert.alert('Acceso Denegado', 'Solo el dueño puede gestionar barberos');
+        router.back();
+      }
+    };
+    
+    checkOwner();
+  }, []);
 
   useEffect(() => {
     loadBarbers();
@@ -52,17 +63,13 @@ export default function BarbersManagement() {
         return;
       }
 
-      const mappedBarbers: Barber[] = data?.map(barber => ({
+      const mappedBarbers = data?.map(barber => ({
         id: barber.id,
         first_name: barber.first_name || '',
         last_name: barber.last_name || '',
-        email: barber.email || '',
         phone: barber.phone || null,
-        specialties: barber.specialties || ['Cortes generales'],
-        rating: barber.rating || 4.5,
-        experience: barber.experience || 'Experiencia profesional',
+        role: barber.role || 'barber',
         status: barber.status || 'active',
-        avatar_url: barber.avatar_url || null,
       })) || [];
 
       setBarbers(mappedBarbers);
@@ -75,13 +82,19 @@ export default function BarbersManagement() {
   };
 
   const openAdd = () => {
+    // Verificar si ya hay 4 barberos
+    if (barbers.length >= 4) {
+      Alert.alert('Límite Alcanzado', 'Solo se permiten máximo 4 barberos en la barbería.');
+      return;
+    }
+    
     setEditing(null);
     setFirstName('');
     setLastName('');
     setEmail('');
     setPhone('');
-    setExperience('');
-    setSpecialtiesText('');
+    setPassword('');
+    setConfirmPassword('');
     setModalVisible(true);
   };
 
@@ -89,10 +102,9 @@ export default function BarbersManagement() {
     setEditing(barber);
     setFirstName(barber.first_name);
     setLastName(barber.last_name);
-    setEmail(barber.email);
     setPhone(barber.phone || '');
-    setExperience(barber.experience);
-    setSpecialtiesText(barber.specialties.join(', '));
+    setPassword(''); // No necesario para edición
+    setConfirmPassword('');
     setModalVisible(true);
   };
 
@@ -102,7 +114,17 @@ export default function BarbersManagement() {
       return;
     }
 
-    const specialtiesArray = specialtiesText.split(',').map(s => s.trim()).filter(s => s.length > 0);
+    // Para crear nuevo barbero, validar contraseña
+    if (!editing) {
+      if (!password.trim() || password.length < 6) {
+        Alert.alert('Contraseña requerida', 'La contraseña debe tener al menos 6 caracteres.');
+        return;
+      }
+      if (password !== confirmPassword) {
+        Alert.alert('Error', 'Las contraseñas no coinciden.');
+        return;
+      }
+    }
 
     try {
       if (editing) {
@@ -112,9 +134,7 @@ export default function BarbersManagement() {
           .update({
             first_name: firstName,
             last_name: lastName,
-            phone: phone || null,
-            experience: experience || 'Experiencia profesional',
-            specialties: specialtiesArray.length > 0 ? specialtiesArray : ['Cortes generales']
+            phone: phone || null
           })
           .eq('id', editing.id);
 
@@ -123,59 +143,131 @@ export default function BarbersManagement() {
           Alert.alert('Error', 'No se pudo actualizar el barbero');
           return;
         }
+
+        Alert.alert('Éxito', 'Barbero actualizado correctamente');
       } else {
-        // Crear nuevo barbero (requiere crear usuario primero)
-        Alert.alert('Información', 'Para agregar un nuevo barbero, primero debe registrarse como usuario y luego cambiar su rol a barbero.');
-        setModalVisible(false);
-        return;
+        // Crear nuevo barbero completo
+        console.log('🔧 Creando nuevo barbero...');
+        
+        // 1. Crear usuario en Supabase Auth
+        const { data: authData, error: authError } = await supabase.auth.signUp({
+          email: email.trim(),
+          password: password,
+          options: {
+            data: {
+              full_name: `${firstName.trim()} ${lastName.trim()}`,
+              role: 'barber'
+            }
+          }
+        });
+
+        if (authError) {
+          console.error('Error creating auth user:', authError);
+          if (authError.message.includes('User already registered')) {
+            Alert.alert('Error', 'Ya existe un usuario con este email. Usa un email diferente.');
+          } else {
+            Alert.alert('Error', `No se pudo crear el usuario: ${authError.message}`);
+          }
+          return;
+        }
+
+        if (!authData.user) {
+          Alert.alert('Error', 'No se pudo crear el usuario.');
+          return;
+        }
+
+        console.log('✅ Usuario creado en Auth:', authData.user.id);
+
+        // 2. Crear/actualizar perfil en la tabla profiles
+          const { error: profileError } = await supabase
+          .from('profiles')
+          .upsert([{
+            id: authData.user.id,
+            first_name: firstName.trim(),
+            last_name: lastName.trim(),
+            phone: phone.trim() || null,
+            role: 'barber',
+            status: 'active'
+          }]);
+
+        if (profileError) {
+          console.error('Error creating profile:', profileError);
+          Alert.alert('Error', `Usuario creado pero no se pudo completar el perfil: ${profileError.message}`);
+          return;
+        }
+
+        console.log('✅ Perfil creado exitosamente');
+        Alert.alert('Éxito', `Barbero ${firstName} ${lastName} creado correctamente. Puede iniciar sesión con el email: ${email}`);
       }
 
       await loadBarbers();
       setModalVisible(false);
-      Alert.alert('Éxito', editing ? 'Barbero actualizado correctamente' : 'Barbero agregado correctamente');
     } catch (error) {
       console.error('Error saving barber:', error);
       Alert.alert('Error', 'Error inesperado al guardar el barbero');
     }
   };
 
-  const toggleBarberStatus = async (barber: Barber) => {
-    const newStatus = barber.status === 'active' ? 'inactive' : 'active';
-    
+
+
+  const confirmDeleteBarber = (barber: Barber) => {
+    Alert.alert(
+      'Eliminar Barbero',
+      `¿Estás seguro de que quieres ELIMINAR a ${barber.first_name} ${barber.last_name}?\n\n⚠️ ADVERTENCIA: Esta acción:\n• Eliminará permanentemente al barbero\n• Cancelará todas sus citas pendientes\n• No se puede deshacer\n\n¿Continuar con la eliminación?`,
+      [
+        {
+          text: 'Cancelar',
+          style: 'cancel'
+        },
+        {
+          text: 'Sí, ELIMINAR',
+          style: 'destructive',
+          onPress: () => {
+            deleteBarber(barber).catch(console.error);
+          }
+        }
+      ]
+    );
+  };
+
+  const deleteBarber = async (barber: Barber) => {
     try {
+      // Primero cancelar todas las citas pendientes del barbero
+      const { error: appointmentsError } = await supabase
+        .from('appointments')
+        .update({ 
+          status: 'cancelled',
+          cancelled_by: 'admin',
+          cancelled_reason: 'Barbero eliminado del sistema'
+        })
+        .eq('barber_id', barber.id)
+        .in('status', ['confirmed', 'pending']);
+
+      if (appointmentsError) {
+        console.error('Error cancelling appointments:', appointmentsError);
+      }
+
+      // Luego eliminar el perfil del barbero
       const { error } = await supabase
         .from('profiles')
-        .update({ status: newStatus })
+        .delete()
         .eq('id', barber.id);
 
       if (error) {
-        console.error('Error updating barber status:', error);
-        Alert.alert('Error', 'No se pudo cambiar el estado del barbero');
+        console.error('Error deleting barber:', error);
+        Alert.alert('Error', 'No se pudo eliminar el barbero');
         return;
       }
 
       await loadBarbers();
-      Alert.alert('Éxito', `Barbero ${newStatus === 'active' ? 'activado' : 'desactivado'} correctamente`);
+      Alert.alert('Barbero Eliminado', `${barber.first_name} ${barber.last_name} ha sido eliminado del sistema. Sus citas pendientes han sido canceladas.`);
     } catch (error) {
-      console.error('Error toggling barber status:', error);
-      Alert.alert('Error', 'Error inesperado al cambiar el estado');
+      console.error('Error deleting barber:', error);
+      Alert.alert('Error', 'Error inesperado al eliminar el barbero');
     }
   };
 
-  const renderStars = (rating: number) => {
-    const stars = [];
-    for (let i = 1; i <= 5; i++) {
-      stars.push(
-        <IconSymbol
-          key={i}
-          name={i <= rating ? "star.fill" : "star"}
-          size={12}
-          color="#FFD700"
-        />
-      );
-    }
-    return stars;
-  };
+
 
   if (loading) {
     return (
@@ -212,7 +304,7 @@ export default function BarbersManagement() {
           <Text style={[styles.backText, { color: colors.text }]}>Volver</Text>
         </TouchableOpacity>
         <Text style={[styles.title, { color: colors.text }]}>
-          Gestión de Barberos
+          Barberos ({barbers.length}/4)
         </Text>
         <TouchableOpacity 
           style={styles.addButton}
@@ -236,43 +328,30 @@ export default function BarbersManagement() {
               key={barber.id}
               style={[
                 styles.barberCard, 
-                { backgroundColor: colors.card },
-                barber.status === 'inactive' && styles.inactiveCard
+                { backgroundColor: colors.card }
               ]}
             >
               <View style={styles.barberHeader}>
                 <Text style={[styles.barberName, { color: colors.text }]}>
                   {`${barber.first_name} ${barber.last_name}`}
                 </Text>
-                <View style={[
-                  styles.statusBadge,
-                  { backgroundColor: barber.status === 'active' ? '#4CAF50' : '#F44336' }
-                ]}>
-                  <Text style={styles.statusText}>
-                    {barber.status === 'active' ? 'Activo' : 'Inactivo'}
+              </View>
+
+              <View style={styles.barberInfo}>
+                {barber.phone && (
+                  <View style={styles.infoRow}>
+                    <IconSymbol name="phone" size={14} color="#2196F3" />
+                    <Text style={[styles.infoText, { color: colors.icon }]}>
+                      {barber.phone}
+                    </Text>
+                  </View>
+                )}
+                <View style={styles.infoRow}>
+                  <IconSymbol name="person.badge" size={14} color="#2196F3" />
+                  <Text style={[styles.infoText, { color: colors.icon }]}>
+                    {barber.role === 'barber' ? 'Barbero' : barber.role}
                   </Text>
                 </View>
-              </View>
-              
-              <View style={styles.ratingContainer}>
-                <View style={styles.stars}>
-                  {renderStars(Math.floor(barber.rating))}
-                </View>
-                <Text style={[styles.ratingText, { color: colors.icon }]}>
-                  {barber.rating.toFixed(1)}
-                </Text>
-              </View>
-              
-              <Text style={[styles.experienceText, { color: colors.icon }]}>
-                {barber.experience}
-              </Text>
-              
-              <View style={styles.specialtiesContainer}>
-                {barber.specialties.map((specialty) => (
-                  <View key={specialty} style={styles.specialtyTag}>
-                    <Text style={styles.specialtyText}>{specialty}</Text>
-                  </View>
-                ))}
               </View>
 
               <View style={styles.actionButtons}>
@@ -283,14 +362,10 @@ export default function BarbersManagement() {
                   <IconSymbol name="pencil" size={16} color="#D4AF37" />
                 </TouchableOpacity>
                 <TouchableOpacity 
-                  style={[styles.actionBtn, barber.status === 'active' ? styles.deactivateBtn : styles.activateBtn]}
-                  onPress={() => toggleBarberStatus(barber)}
+                  style={[styles.actionBtn, styles.deleteBtn]}
+                  onPress={() => confirmDeleteBarber(barber)}
                 >
-                  <IconSymbol 
-                    name={barber.status === 'active' ? 'pause' : 'play'} 
-                    size={16} 
-                    color={barber.status === 'active' ? '#F44336' : '#4CAF50'} 
-                  />
+                  <IconSymbol name="trash" size={16} color="#E53935" />
                 </TouchableOpacity>
               </View>
             </View>
@@ -299,13 +374,17 @@ export default function BarbersManagement() {
       </ScrollView>
 
       <Modal visible={modalVisible} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView 
+          style={styles.modalOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
           <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
             <Text style={[styles.modalTitle, { color: colors.text }]}>
               {editing ? 'Editar Barbero' : 'Agregar Barbero'}
             </Text>
 
-            <TextInput
+            <ScrollView style={styles.modalScrollView} showsVerticalScrollIndicator={false}>
+              <TextInput
               placeholder="Nombre"
               placeholderTextColor={colors.icon}
               value={firstName}
@@ -334,21 +413,27 @@ export default function BarbersManagement() {
               onChangeText={setPhone}
               style={[styles.input, { color: colors.text, borderColor: colors.border }]}
             />
-            <TextInput
-              placeholder="Experiencia"
-              placeholderTextColor={colors.icon}
-              value={experience}
-              onChangeText={setExperience}
-              style={[styles.input, { color: colors.text, borderColor: colors.border }]}
-            />
-            <TextInput
-              placeholder="Especialidades (separadas por comas)"
-              placeholderTextColor={colors.icon}
-              value={specialtiesText}
-              onChangeText={setSpecialtiesText}
-              style={[styles.input, { color: colors.text, borderColor: colors.border }]}
-              multiline
-            />
+            {!editing && (
+              <>
+                <TextInput
+                  placeholder="Contraseña"
+                  placeholderTextColor={colors.icon}
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry
+                  style={[styles.input, { color: colors.text, borderColor: colors.border }]}
+                />
+                <TextInput
+                  placeholder="Confirmar contraseña"
+                  placeholderTextColor={colors.icon}
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                  secureTextEntry
+                  style={[styles.input, { color: colors.text, borderColor: colors.border }]}
+                />
+              </>
+            )}
+            </ScrollView>
 
             <View style={styles.modalActions}>
               <TouchableOpacity 
@@ -367,7 +452,7 @@ export default function BarbersManagement() {
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );
@@ -436,9 +521,6 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     elevation: 2,
   },
-  inactiveCard: {
-    opacity: 0.6,
-  },
   barberHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -450,50 +532,21 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     flex: 1,
   },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
+  barberInfo: {
+    marginBottom: 8,
+    gap: 4,
   },
-  statusText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  ratingContainer: {
+  infoRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    gap: 8,
   },
-  stars: {
-    flexDirection: 'row',
-    marginRight: 8,
+  infoText: {
+    fontSize: 12,
+    flex: 1,
   },
-  ratingText: {
-    fontSize: 14,
-  },
-  experienceText: {
-    fontSize: 14,
-    marginBottom: 8,
-  },
-  specialtiesContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginBottom: 10,
-  },
-  specialtyTag: {
-    backgroundColor: '#D4AF37',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 10,
-    marginRight: 5,
-    marginBottom: 3,
-  },
-  specialtyText: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: '500',
-  },
+
+
   actionButtons: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
@@ -521,6 +574,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(244, 67, 54, 0.3)',
   },
+  deleteBtn: {
+    backgroundColor: 'rgba(229, 57, 53, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(229, 57, 53, 0.3)',
+  },
   modalOverlay: {
     flex: 1,
     justifyContent: 'center',
@@ -544,6 +602,9 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginBottom: 25,
     textAlign: 'center',
+  },
+  modalScrollView: {
+    maxHeight: 400,
   },
   input: {
     borderWidth: 2,
