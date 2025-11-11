@@ -1,86 +1,85 @@
+import { supabase } from '@/utils/database';
 import { router } from 'expo-router';
+import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { IconSymbol } from '../../components/ui/icon-symbol';
 import { Colors } from '../../constants/theme';
 import { useColorScheme } from '../../hooks/use-color-scheme';
 
+
 export default function AppointmentsManagement() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
 
-  const appointments = [
-    { 
-      id: 1,
-      client: 'Juan Pérez', 
-      service: 'Corte Clásico', 
-      time: '09:00 AM',
-      date: 'Hoy',
-      status: 'Confirmada',
-      phone: '+57 300 123 4567',
-      barber: 'Carlos Mendoza',
-      price: '$15.000'
-    },
-    { 
-      id: 2,
-      client: 'María García', 
-      service: 'Corte + Barba', 
-      time: '10:30 AM',
-      date: 'Hoy',
-      status: 'Pendiente',
-      phone: '+57 301 234 5678',
-      barber: 'Luis Rodríguez',
-      price: '$25.000'
-    },
-    { 
-      id: 3,
-      client: 'Pedro López', 
-      service: 'Barba Completa', 
-      time: '12:00 PM',
-      date: 'Hoy',
-      status: 'En Proceso',
-      phone: '+57 302 345 6789',
-      barber: 'Carlos Mendoza',
-      price: '$12.000'
-    },
-    { 
-      id: 4,
-      client: 'Ana Martínez', 
-      service: 'Corte Clásico', 
-      time: '02:30 PM',
-      date: 'Hoy',
-      status: 'Pendiente',
-      phone: '+57 303 456 7890',
-      barber: 'Miguel Torres',
-      price: '$15.000'
-    },
-    { 
-      id: 5,
-      client: 'Luis Torres', 
-      service: 'Corte + Barba', 
-      time: '04:00 PM',
-      date: 'Hoy',
-      status: 'Pendiente',
-      phone: '+57 304 567 8901',
-      barber: 'Luis Rodríguez',
-      price: '$25.000'
-    },
-    { 
-      id: 6,
-      client: 'Carlos Ruiz', 
-      service: 'Corte Clásico', 
-      time: '05:30 PM',
-      date: 'Hoy',
-      status: 'Confirmada',
-      phone: '+57 305 678 9012',
-      barber: 'Carlos Mendoza',
-      price: '$15.000'
-    },
-  ];
+  // fetch a la base de datos tabla appointments
+  const [appointments, setAppointments] = useState<any[]>([]);
+  const [barberID, setBarberID] = useState<string | null>(null);
+  
+  // useEffect para obtener el barberID del usuario autenticado
+  useEffect(() => {
+    const getCurrentUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setBarberID(user?.id || null);
+    };
+    
+    getCurrentUser();
+  }, []);
+
+  // useEffect para cargar las citas cuando tenemos el barberID
+  useEffect(() => {
+    if (!barberID) {
+      console.log('⏳ Esperando barberID...');
+      return;
+    }
+
+    const fetchAppointments = async () => {
+      console.log('🔍 Cargando citas para barber:', barberID);
+      
+      const { data, error } = await supabase
+        .from('appointments')
+        .select(`
+          *,
+          services (
+            id,
+            name,
+            price
+          )
+        `)
+        .order('time', { ascending: true })
+        .eq('barber_id', barberID);
+        
+      if (error) {
+        console.error('Error fetching appointments:', error);
+        setAppointments([]);
+      } else {
+        console.log('✅ Citas cargadas:', data);
+        // Mapear los datos para que coincidan con la estructura esperada en la UI
+        const mappedAppointments = data?.map(appointment => ({
+          id: appointment.id,
+          client: appointment.customer_name || 'Cliente',
+          service: appointment.services?.name || 'Servicio',
+          time: appointment.time,
+          barber: 'Barbero', // En este caso el barbero es el usuario actual
+          price: `$${appointment.services?.price || appointment.price || 0}`,
+          status: appointment.status === 'confirmed' ? 'Confirmada' : 
+                  appointment.status === 'pending' ? 'Pendiente' : 
+                  appointment.status === 'in_progress' ? 'En Proceso' : 'Pendiente',
+          date: appointment.date,
+          notes: appointment.notes,
+          customer_phone: appointment.customer_phone,
+        })) || [];
+        
+        setAppointments(mappedAppointments);
+      }
+    };
+
+    fetchAppointments();
+  }, [barberID]);
 
   // Filtrar citas por estado
-  const pendingAppointments = appointments.filter(apt => apt.status === 'Pendiente');
-  const confirmedAppointments = appointments.filter(apt => apt.status === 'Confirmada');
-  const inProcessAppointments = appointments.filter(apt => apt.status === 'En Proceso');
+  const pendingAppointments = appointments.filter(app => app.status === 'Pendiente');
+  const confirmedAppointments = appointments.filter(app => app.status === 'Confirmada');
+  const inProcessAppointments = appointments.filter(app => app.status === 'En Proceso');
 
   const getStatusColor = (status: string) => {
     switch (status) {
