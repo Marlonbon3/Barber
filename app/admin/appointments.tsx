@@ -143,11 +143,6 @@ export default function AppointmentsManagement() {
           <Text style={[styles.title, { color: colors.text }]}>
             Gestión de Citas
           </Text>
-          <Image
-            source={{ uri: 'https://media.tenor.com/2nKSTDDekOgAAAAM/scissors-barber.gif' }}
-            style={styles.headerGif}
-            contentFit="contain"
-          />
         </View>
         <View style={styles.updateInfo}>
           {loading && !refreshing && (
