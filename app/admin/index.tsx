@@ -37,7 +37,7 @@ export default function AdminDashboard() {
       }
   
       const fetchAppointments = async () => {
-        console.log('🔍 Cargando citas para barber:', barberID);
+        console.log('🔍 Cargando citas para barber');
         
         const { data, error } = await supabase
           .from('appointments')
