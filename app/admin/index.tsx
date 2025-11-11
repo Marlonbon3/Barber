@@ -1,4 +1,6 @@
+import { supabase } from '@/utils/database';
 import { router } from 'expo-router';
+import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { IconSymbol } from '../../components/ui/icon-symbol';
 import { Colors } from '../../constants/theme';
@@ -8,18 +10,79 @@ export default function AdminDashboard() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
 
-  // Datos simulados de citas para el dashboard
-  const todayAppointments = [
-    { id: 1, client: 'Juan Pérez', time: '09:00 AM', service: 'Corte Clásico', status: 'Confirmada' },
-    { id: 2, client: 'María García', time: '10:30 AM', service: 'Corte + Barba', status: 'En Proceso' },
-    { id: 3, client: 'Carlos López', time: '12:00 PM', service: 'Barba Completa', status: 'Pendiente' },
-    { id: 4, client: 'Ana Martínez', time: '02:30 PM', service: 'Corte Clásico', status: 'Pendiente' },
-    { id: 5, client: 'Luis Torres', time: '04:00 PM', service: 'Corte + Barba', status: 'Pendiente' },
-  ];
-
-  const pendingAppointments = todayAppointments.filter(apt => apt.status === 'Pendiente');
-  const confirmedAppointments = todayAppointments.filter(apt => apt.status === 'Confirmada');
-  const inProcessAppointments = todayAppointments.filter(apt => apt.status === 'En Proceso');
+  // fetch a la base de datos tabla appointments
+    const [appointments, setAppointments] = useState<any[]>([]);
+    const [barberID, setBarberID] = useState<string | null>(null);
+    
+    // useEffect para obtener el barberID del usuario autenticado
+    useEffect(() => {
+      const getCurrentUser = async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        setBarberID(user?.id || null);
+      };
+      
+      getCurrentUser();
+    }, []);
+  
+    // useEffect para cargar las citas cuando tenemos el barberID
+    useEffect(() => {
+      if (!barberID) {
+        console.log('⏳ Esperando barberID...');
+        return;
+      }
+  
+      const fetchAppointments = async () => {
+        console.log('🔍 Cargando citas para barber:', barberID);
+        
+        const { data, error } = await supabase
+          .from('appointments')
+          .select(`
+            *,
+            services (
+              id,
+              name,
+              price
+            )
+          `)
+          .order('time', { ascending: true })
+          .eq('barber_id', barberID);
+          
+        if (error) {
+          console.error('Error fetching appointments:', error);
+          setAppointments([]);
+        } else {
+          console.log('✅ Citas cargadas:', data);
+          // Mapear los datos para que coincidan con la estructura esperada en la UI
+          const mappedAppointments = data?.map(appointment => ({
+            id: appointment.id,
+            client: appointment.customer_name || 'Cliente',
+            service: appointment.services?.name || 'Servicio',
+            time: appointment.time,
+            barber: 'Barbero', // En este caso el barbero es el usuario actual
+            price: `$${appointment.services?.price || appointment.price || 0}`,
+            status: appointment.status === 'confirmed' ? 'Confirmada' : 
+                    appointment.status === 'pending' ? 'Pendiente' : 
+                    appointment.status === 'in_progress' ? 'En Proceso' : 'Pendiente',
+            date: appointment.date,
+            notes: appointment.notes,
+            customer_phone: appointment.customer_phone,
+          })) || [];
+          
+          setAppointments(mappedAppointments);
+        }
+      };
+  
+      fetchAppointments();
+    }, [barberID]);
+  
+    // Filtrar citas por estado
+    const pendingAppointments = appointments.filter(app => app.status === 'Pendiente');
+    const confirmedAppointments = appointments.filter(app => app.status === 'Confirmada');
+    const inProcessAppointments = appointments.filter(app => app.status === 'En Proceso');
+    
+    // Filtrar citas de hoy
+    const today = new Date().toISOString().split('T')[0]; // Formato YYYY-MM-DD
+    const todayAppointments = appointments.filter(app => app.date === today);
 
   // Función para obtener el color según el estado
   const getStatusColor = (status: string) => {
@@ -117,30 +180,39 @@ export default function AdminDashboard() {
         </View>
         
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          {todayAppointments.slice(0, 4).map((appointment) => (
-            <View
-              key={appointment.id}
-              style={[styles.appointmentCard, { backgroundColor: colors.card }]}
-            >
-              <View style={styles.appointmentHeader}>
-                <Text style={[styles.appointmentTime, { color: colors.text }]}>
-                  {appointment.time}
-                </Text>
-                <View style={[
-                  styles.statusBadge,
-                  { backgroundColor: getStatusColor(appointment.status) }
-                ]}>
-                  <Text style={styles.statusText}>{appointment.status}</Text>
+          {todayAppointments.length > 0 ? (
+            todayAppointments.slice(0, 4).map((appointment) => (
+              <View
+                key={appointment.id}
+                style={[styles.appointmentCard, { backgroundColor: colors.card }]}
+              >
+                <View style={styles.appointmentHeader}>
+                  <Text style={[styles.appointmentTime, { color: colors.text }]}>
+                    {appointment.time}
+                  </Text>
+                  <View style={[
+                    styles.statusBadge,
+                    { backgroundColor: getStatusColor(appointment.status) }
+                  ]}>
+                    <Text style={styles.statusText}>{appointment.status}</Text>
+                  </View>
                 </View>
+                <Text style={[styles.clientName, { color: colors.text }]}>
+                  {appointment.client}
+                </Text>
+                <Text style={[styles.serviceName, { color: colors.icon }]}>
+                  {appointment.service}
+                </Text>
               </View>
-              <Text style={[styles.clientName, { color: colors.text }]}>
-                {appointment.client}
-              </Text>
-              <Text style={[styles.serviceName, { color: colors.icon }]}>
-                {appointment.service}
+            ))
+          ) : (
+            <View style={[styles.emptyCard, { backgroundColor: colors.card }]}>
+              <IconSymbol name="calendar.badge.clock" size={32} color={colors.icon} />
+              <Text style={[styles.emptyText, { color: colors.icon }]}>
+                No hay citas programadas para hoy
               </Text>
             </View>
-          ))}
+          )}
         </ScrollView>
       </View>
 
@@ -307,5 +379,18 @@ const styles = StyleSheet.create({
   },
   serviceName: {
     fontSize: 14,
+  },
+  emptyCard: {
+    width: 250,
+    padding: 20,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 2,
+  },
+  emptyText: {
+    fontSize: 14,
+    textAlign: 'center',
+    marginTop: 8,
   },
 });
