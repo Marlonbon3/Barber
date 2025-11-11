@@ -1,7 +1,8 @@
 import { supabase } from '@/utils/database';
+import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { IconSymbol } from '../../components/ui/icon-symbol';
 import { Colors } from '../../constants/theme';
 import { useColorScheme } from '../../hooks/use-color-scheme';
@@ -14,6 +15,9 @@ export default function AppointmentsManagement() {
   // fetch a la base de datos tabla appointments
   const [appointments, setAppointments] = useState<any[]>([]);
   const [barberID, setBarberID] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
+  const [loading, setLoading] = useState(true);
   
   // useEffect para obtener el barberID del usuario autenticado
   useEffect(() => {
@@ -25,14 +29,20 @@ export default function AppointmentsManagement() {
     getCurrentUser();
   }, []);
 
-  // useEffect para cargar las citas cuando tenemos el barberID
-  useEffect(() => {
+  // Función optimizada para cargar citas
+  const fetchAppointments = useCallback(async (showRefreshing = false) => {
     if (!barberID) {
       console.log('⏳ Esperando barberID...');
       return;
     }
 
-    const fetchAppointments = async () => {
+    if (showRefreshing) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
+
+    try {
       console.log('🔍 Cargando citas para barber:', barberID);
       
       const { data, error } = await supabase
@@ -70,11 +80,40 @@ export default function AppointmentsManagement() {
         })) || [];
         
         setAppointments(mappedAppointments);
+        setLastUpdate(new Date());
       }
-    };
-
-    fetchAppointments();
+    } catch (error) {
+      console.error('❌ Error inesperado:', error);
+    } finally {
+      if (showRefreshing) {
+        setRefreshing(false);
+      } else {
+        setLoading(false);
+      }
+    }
   }, [barberID]);
+
+  // useEffect para cargar las citas cuando tenemos el barberID
+  useEffect(() => {
+    fetchAppointments();
+  }, [fetchAppointments]);
+
+  // useEffect para auto-actualización cada 30 segundos
+  useEffect(() => {
+    if (!barberID) return;
+
+    const interval = setInterval(() => {
+      console.log('🔄 Auto-actualizando citas...');
+      fetchAppointments();
+    }, 60000); // 60 segundos
+
+    return () => clearInterval(interval);
+  }, [barberID, fetchAppointments]);
+
+  // Función para refresh manual
+  const onRefresh = useCallback(() => {
+    fetchAppointments(true);
+  }, [fetchAppointments]);
 
   // Filtrar citas por estado
   const pendingAppointments = appointments.filter(app => app.status === 'Pendiente');
@@ -100,12 +139,40 @@ export default function AppointmentsManagement() {
           <IconSymbol name="arrow.left" size={20} color="#D4AF37" />
           <Text style={[styles.backText, { color: colors.text }]}>Volver</Text>
         </TouchableOpacity>
-        <Text style={[styles.title, { color: colors.text }]}>
-          Gestión de Citas
-        </Text>
+        <View style={styles.titleContainer}>
+          <Text style={[styles.title, { color: colors.text }]}>
+            Gestión de Citas
+          </Text>
+          <Image
+            source={{ uri: 'https://media.tenor.com/2nKSTDDekOgAAAAM/scissors-barber.gif' }}
+            style={styles.headerGif}
+            contentFit="contain"
+          />
+        </View>
+        <View style={styles.updateInfo}>
+          {loading && !refreshing && (
+            <IconSymbol name="clock.arrow.circlepath" size={14} color="#D4AF37" />
+          )}
+          {!loading && (
+            <IconSymbol name="clock" size={14} color={colors.icon} />
+          )}
+          <Text style={[styles.updateText, { color: colors.icon }]}>
+            {loading && !refreshing ? 'Actualizando...' : `Última actualización: ${lastUpdate.toLocaleTimeString()}`}
+          </Text>
+        </View>
       </View>
       
-      <ScrollView style={styles.appointmentsList}>
+      <ScrollView 
+        style={styles.appointmentsList}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={['#D4AF37']}
+            tintColor="#D4AF37"
+          />
+        }
+      >
         {/* Sección de citas en espera */}
         {pendingAppointments.length > 0 && (
           <View style={styles.section}>
@@ -271,6 +338,15 @@ export default function AppointmentsManagement() {
                       {appointment.price}
                     </Text>
                   </View>
+                  {/* ass gif */}
+                        <View>
+                          <Image
+                          style={styles.image}
+                          source="https://media1.tenor.com/m/PMZcTk_3i-sAAAAC/ass.gif"
+                          contentFit="cover"
+                          transition={1000}
+                        />
+                        </View>
                 </View>
               </View>
             ))}
@@ -283,9 +359,19 @@ export default function AppointmentsManagement() {
           confirmedAppointments.length === 0 &&
           inProcessAppointments.length === 0 && (
             <View style={styles.section}>
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>
-                No hay citas en este momento.
-              </Text>
+              <View style={styles.noCitasContainer}>
+                <Image
+                  source={{ uri: 'https://media.tenor.com/AF6yIbPWid0AAAAi/vulgo-phx-limpar.gif' }}
+                  style={styles.gifImage}
+                  contentFit="contain"
+                />
+                <Text style={[styles.noCitasTitle, { color: colors.text }]}>
+                  Todo tranquilo por aquí 💈
+                </Text>
+                <Text style={[styles.noCitasSubtitle, { color: colors.icon }]}>
+                  No hay citas programadas en este momento. ¡Perfecto momento para descansar!
+                </Text>
+              </View>
             </View>
           )
         }
@@ -385,5 +471,53 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginLeft: 8,
     fontWeight: '600',
+  },
+  updateInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  updateText: {
+    fontSize: 12,
+    marginLeft: 4,
+  },
+  image: {
+    flex: 1,
+    width: '100%',
+    backgroundColor: '#0553',
+  },
+  noCitasContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+    paddingHorizontal: 20,
+  },
+  gifImage: {
+    width: 500,
+    height: 150,
+    borderRadius: 12,
+    marginBottom: 20,
+  },
+  noCitasTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  noCitasSubtitle: {
+    fontSize: 16,
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+  titleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+  },
+  headerGif: {
+    width: 30,
+    height: 30,
+    borderRadius: 6,
   },
 });

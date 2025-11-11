@@ -5,6 +5,7 @@ import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-nati
 import { IconSymbol } from '../../components/ui/icon-symbol';
 import { Colors } from '../../constants/theme';
 import { useColorScheme } from '../../hooks/use-color-scheme';
+import { Image } from 'expo-image';
 
 export default function AdminDashboard() {
   const colorScheme = useColorScheme();
@@ -392,5 +393,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
     marginTop: 8,
+  },
+  image: {
+    flex: 1,
+    width: '100%',
+    backgroundColor: '#0553',
   },
 });
