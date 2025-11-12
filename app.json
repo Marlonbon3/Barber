@@ -2,6 +2,7 @@
   "expo": {
     "name": "Barberia",
     "slug": "Barberia",
+    "owner": "elrobertds",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -48,7 +49,7 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "8879d46f-7d44-4b1c-8720-4fcf94b7f630"
+        "projectId": "f0dcf863-7940-4815-8acf-c228b71f3a0c"
       }
     }
   }
