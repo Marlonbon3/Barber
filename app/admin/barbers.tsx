@@ -29,8 +29,9 @@ export default function BarbersManagement() {
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
-  // Verificar si el usuario es el dueño
+  // Verificar si el usuario es el dueño y obtener su ID
   useEffect(() => {
     const checkOwner = async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -39,7 +40,11 @@ export default function BarbersManagement() {
       if (user?.email !== 'jaimeb@gmail.com') {
         Alert.alert('Acceso Denegado', 'Solo el dueño puede gestionar barberos');
         router.back();
+        return;
       }
+      
+      // Guardar el ID del usuario actual
+      setCurrentUserId(user.id);
     };
     
     checkOwner();
@@ -361,12 +366,15 @@ export default function BarbersManagement() {
                 >
                   <IconSymbol name="pencil" size={16} color="#D4AF37" />
                 </TouchableOpacity>
-                <TouchableOpacity 
-                  style={[styles.actionBtn, styles.deleteBtn]}
-                  onPress={() => confirmDeleteBarber(barber)}
-                >
-                  <IconSymbol name="trash" size={16} color="#E53935" />
-                </TouchableOpacity>
+                {/* Solo mostrar botón de eliminar si no es el usuario actual */}
+                {currentUserId !== barber.id && (
+                  <TouchableOpacity 
+                    style={[styles.actionBtn, styles.deleteBtn]}
+                    onPress={() => confirmDeleteBarber(barber)}
+                  >
+                    <IconSymbol name="trash" size={16} color="#E53935" />
+                  </TouchableOpacity>
+                )}
               </View>
             </View>
           ))

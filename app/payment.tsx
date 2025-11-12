@@ -53,6 +53,15 @@ export default function PaymentScreen() {
     try {
       console.log('🔄 Procesando pago con tarjeta...');
       
+      // Delay verdaderamente aleatorio combinando múltiples factores
+      const timestamp = Date.now();
+      const randomBase = Math.random();
+      const timestampSeed = (timestamp % 1000) / 1000; // Usar los últimos 3 dígitos del timestamp
+      const combinedRandom = (randomBase + timestampSeed + Math.random()) % 1;
+      const randomDelay = Math.floor(combinedRandom * 1500 + 500); // 500ms a 2000ms
+      console.log(`⏱️ Aplicando delay de ${randomDelay}ms (seed: ${timestamp}) para prevenir colisiones...`);
+      await new Promise(resolve => setTimeout(resolve, randomDelay));
+      
       // Simular el proceso de confirmación de pago
       // En producción, aquí crearías un Payment Intent real
       const clientSecret = `pi_test_${Date.now()}_secret_example`;
@@ -111,6 +120,7 @@ export default function PaymentScreen() {
         throw new Error('Usuario no autenticado');
       }
 
+      // Crear la cita con información de pago
       // Crear la cita con información de pago
       const { error } = await supabase
         .from('appointments')

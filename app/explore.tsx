@@ -41,39 +41,60 @@ export default function BookAppointmentScreen() {
     getCurrentUser();
   }, []);
 
-  const timeSlots = [
-    '9:00 AM', '9:30 AM', '10:00 AM', '10:30 AM', '11:00 AM', '11:30 AM',
-    '12:00 PM', '12:30 PM', '1:00 PM', '1:30 PM', '2:00 PM', '2:30 PM',
-    '3:00 PM', '3:30 PM', '4:00 PM', '4:30 PM', '5:00 PM', '5:30 PM',
-    '6:00 PM', '6:30 PM'
-  ];
+  // Generar slots desde 10:00 AM hasta 11:00 PM (30 mins) y aplicar filtros por día más adelante
+  const generateBaseTimeSlots = (startHour = 10, endHour = 23) => {
+    const slots: string[] = [];
+    for (let h = startHour; h <= endHour; h++) {
+      // 0 and 30 minutes
+      for (const m of [0, 30]) {
+        // Si estamos en la última hora (endHour) y minuto es 30, saltarlo para evitar pasar de endHour:00
+        if (h === endHour && m === 30) continue;
+        let displayHour = h;
+        let meridiem = 'AM';
+        if (h === 0) displayHour = 12;
+        else if (h >= 12) {
+          meridiem = 'PM';
+          if (h > 12) displayHour = h - 12;
+        }
+        const timeString = `${displayHour}:${m.toString().padStart(2, '0')} ${meridiem}`;
+        slots.push(timeString);
+      }
+    }
+    return slots;
+  };
+
+  const timeSlots = generateBaseTimeSlots(10, 23);
 
   // Generar fechas dinámicamente
   const generateDates = () => {
     const today = new Date();
-    const dates = [];
-    
+    const dates: string[] = [];
+
+    const dayNamesShort = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+    const dayNamesFull = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+    const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+
     for (let i = 0; i < 7; i++) {
       const date = new Date(today);
       date.setDate(today.getDate() + i);
-      
-      const dayNames = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
-      const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 
-                         'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-      
+
+      const fullDay = dayNamesFull[date.getDay()];
+      const shortDay = dayNamesShort[date.getDay()];
+      const initial = fullDay.charAt(0).toUpperCase();
+
       let dayLabel;
       if (i === 0) {
-        dayLabel = 'Hoy';
+        dayLabel = `${initial} - Hoy`;
       } else if (i === 1) {
-        dayLabel = 'Mañana';
+        dayLabel = `${initial} - Mañana`;
       } else {
-        dayLabel = dayNames[date.getDay()];
+        dayLabel = `${initial} - ${shortDay}`;
       }
-      
+
       const formattedDate = `${dayLabel}, ${date.getDate()} ${monthNames[date.getMonth()]}`;
       dates.push(formattedDate);
     }
-    
+
     return dates;
   };
 
@@ -365,6 +386,17 @@ export default function BookAppointmentScreen() {
 
     slotDate.setHours(hour, minute, 0, 0);
 
+    // Aplicar regla por día: Lunes-Viernes -> 10:00-23:00, Sáb-Dom -> 10:00-19:00
+    const dayOfWeek = slotDate.getDay(); // 0 = Domingo, 6 = Sábado
+    const slotMinutes = convertTimeToMinutes(time);
+    if (dayOfWeek === 0 || dayOfWeek === 6) {
+      // Fin de semana: hasta 19:00 (19*60)
+      if (slotMinutes > 19 * 60) return false;
+    } else {
+      // Entre semana: hasta 23:00 (23*60). Como generamos timeSlots desde 10:00 no comprobamos límite inferior.
+      if (slotMinutes > 23 * 60) return false;
+    }
+
     // Mantener el slot sólo si está en el futuro respecto a ahora
     return slotDate > now;
   });
@@ -390,6 +422,15 @@ export default function BookAppointmentScreen() {
       Alert.alert('Error', 'Debes iniciar sesión para agendar una cita');
       return;
     }
+
+    // Delay verdaderamente aleatorio antes de proceder al pago
+    const timestamp = Date.now();
+    const randomBase = Math.random();
+    const timestampSeed = (timestamp % 1000) / 1000;
+    const combinedRandom = (randomBase + timestampSeed + Math.random()) % 1;
+    const randomDelay = Math.floor(combinedRandom * 1500 + 500); // 500ms a 2000ms
+    console.log(`⏱️ Aplicando delay de ${randomDelay}ms antes de proceder al pago (seed: ${timestamp})...`);
+    await new Promise(resolve => setTimeout(resolve, randomDelay));
 
     // Validar que el usuario no tenga más de 3 citas activas
     try {
